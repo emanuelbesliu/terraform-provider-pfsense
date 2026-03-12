@@ -53,6 +53,10 @@ type mutexes struct {
 	ExecutePHPCommand         sync.RWMutex
 	FirewallAlias             sync.RWMutex
 	FirewallFilterReload      sync.Mutex
+	Gateway                   sync.RWMutex
+	GatewayApply              sync.Mutex
+	Route                     sync.RWMutex
+	RouteApply                sync.Mutex
 }
 
 type Client struct {
