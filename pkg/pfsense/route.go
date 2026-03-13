@@ -61,6 +61,16 @@ func (routes Routes) GetByNetworkAndGateway(network string, gateway string) (*Ro
 	return nil, fmt.Errorf("route %w with network '%s' and gateway '%s'", ErrNotFound, network, gateway)
 }
 
+func (routes Routes) GetByNetwork(network string) (*Route, error) {
+	for _, r := range routes {
+		if r.Network == network {
+			return &r, nil
+		}
+	}
+
+	return nil, fmt.Errorf("route %w with network '%s'", ErrNotFound, network)
+}
+
 func (routes Routes) GetControlIDByNetworkAndGateway(network string, gateway string) (*int, error) {
 	for _, r := range routes {
 		if r.Network == network && r.Gateway == gateway {
