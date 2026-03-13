@@ -62,6 +62,8 @@ type mutexes struct {
 	InterfaceGroup            sync.RWMutex
 	Route                     sync.RWMutex
 	RouteApply                sync.Mutex
+	SystemGeneral             sync.RWMutex
+	SystemGeneralApply        sync.Mutex
 	VLAN                      sync.RWMutex
 }
 
