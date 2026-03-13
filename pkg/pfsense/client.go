@@ -68,6 +68,8 @@ type mutexes struct {
 	AdvancedAdminApply        sync.Mutex
 	AdvancedFirewall          sync.RWMutex
 	AdvancedFirewallApply     sync.Mutex
+	AdvancedMisc              sync.RWMutex
+	AdvancedMiscApply         sync.Mutex
 	AdvancedNetworking        sync.RWMutex
 	AdvancedNetworkingApply   sync.Mutex
 	VLAN                      sync.RWMutex
