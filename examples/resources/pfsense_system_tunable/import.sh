@@ -1,0 +1,1 @@
+terraform import pfsense_system_tunable.example tunable_name

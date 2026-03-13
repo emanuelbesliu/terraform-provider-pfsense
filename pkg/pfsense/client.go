@@ -74,6 +74,8 @@ type mutexes struct {
 	AdvancedNetworkingApply    sync.Mutex
 	AdvancedNotifications      sync.RWMutex
 	AdvancedNotificationsApply sync.Mutex
+	SystemTunable              sync.RWMutex
+	SystemTunableApply         sync.Mutex
 	VLAN                       sync.RWMutex
 }
 
