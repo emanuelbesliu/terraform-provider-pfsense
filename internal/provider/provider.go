@@ -245,6 +245,8 @@ func (p *pfSenseProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 func (p *pfSenseProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
+		NewAuthServerDataSource,
+		NewAuthServersDataSource,
 		NewDHCPv4StaticMappingDataSource,
 		NewDHCPv4StaticMappingsDataSource,
 		NewDNSResolverConfigFileDataSource,
@@ -287,6 +289,7 @@ func (p *pfSenseProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 func (p *pfSenseProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		NewAuthServerResource,
 		NewDNSResolverConfigFileResource,
 		NewDNSResolverDomainOverrideResource,
 		NewDNSResolverHostOverrideResource,

@@ -80,6 +80,7 @@ type mutexes struct {
 	UserApply                  sync.Mutex
 	Group                      sync.RWMutex
 	GroupApply                 sync.Mutex
+	AuthServer                 sync.RWMutex
 	VLAN                       sync.RWMutex
 }
 
