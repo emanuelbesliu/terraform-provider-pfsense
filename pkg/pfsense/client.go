@@ -55,6 +55,8 @@ type mutexes struct {
 	FirewallFilterReload      sync.Mutex
 	Gateway                   sync.RWMutex
 	GatewayApply              sync.Mutex
+	GatewayGroup              sync.RWMutex
+	GatewayGroupApply         sync.Mutex
 	Route                     sync.RWMutex
 	RouteApply                sync.Mutex
 }

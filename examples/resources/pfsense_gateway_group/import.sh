@@ -1,0 +1,1 @@
+terraform import pfsense_gateway_group.example group_name
