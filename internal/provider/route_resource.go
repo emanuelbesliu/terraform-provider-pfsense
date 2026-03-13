@@ -70,7 +70,7 @@ func (r *RouteResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: RouteModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"disabled": schema.BoolAttribute{

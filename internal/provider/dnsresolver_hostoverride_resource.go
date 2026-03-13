@@ -74,6 +74,7 @@ func (r *DNSResolverHostOverrideResource) Schema(_ context.Context, _ resource.S
 				Required:    true,
 				ElementType: types.StringType,
 				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
 					listvalidator.ValueStringsAre(stringIsIPAddress("Any")),
 				},
 			},
@@ -81,7 +82,7 @@ func (r *DNSResolverHostOverrideResource) Schema(_ context.Context, _ resource.S
 				Description: DNSResolverHostOverrideModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"apply": schema.BoolAttribute{
@@ -123,7 +124,7 @@ func (r *DNSResolverHostOverrideResource) Schema(_ context.Context, _ resource.S
 							Description: DNSResolverHostOverrideAliasModel{}.descriptions()["description"].Description,
 							Optional:    true,
 							Validators: []validator.String{
-								stringvalidator.LengthAtLeast(1),
+								stringvalidator.LengthBetween(1, 200),
 							},
 						},
 					},

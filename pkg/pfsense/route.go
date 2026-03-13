@@ -26,18 +26,30 @@ type Route struct {
 }
 
 func (r *Route) SetNetwork(network string) error {
+	if err := ValidateNetwork(network); err != nil {
+		return fmt.Errorf("%w, invalid network: %w", ErrClientValidation, err)
+	}
+
 	r.Network = network
 
 	return nil
 }
 
 func (r *Route) SetGateway(gateway string) error {
+	if gateway == "" {
+		return fmt.Errorf("%w, gateway must not be empty", ErrClientValidation)
+	}
+
 	r.Gateway = gateway
 
 	return nil
 }
 
 func (r *Route) SetDescription(description string) error {
+	if len(description) > 200 {
+		return fmt.Errorf("%w, description must be at most 200 characters", ErrClientValidation)
+	}
+
 	r.Description = description
 
 	return nil

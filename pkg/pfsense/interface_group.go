@@ -3,8 +3,11 @@ package pfsense
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var interfaceGroupNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]*$`)
 
 type interfaceGroupResponse struct {
 	Name        string `json:"ifname"`
@@ -23,6 +26,14 @@ type InterfaceGroup struct {
 func (g *InterfaceGroup) SetName(name string) error {
 	if name == "" {
 		return fmt.Errorf("%w, interface group name is required", ErrClientValidation)
+	}
+
+	if len(name) > 15 {
+		return fmt.Errorf("%w, interface group name must be 15 characters or less", ErrClientValidation)
+	}
+
+	if !interfaceGroupNameRegex.MatchString(name) {
+		return fmt.Errorf("%w, interface group name must start with a letter and contain only alphanumeric characters", ErrClientValidation)
 	}
 
 	g.Name = name
@@ -145,6 +156,30 @@ func (pf *Client) GetInterfaceGroup(ctx context.Context, name string) (*Interfac
 func (pf *Client) CreateInterfaceGroup(ctx context.Context, req InterfaceGroup) (*InterfaceGroup, error) {
 	defer pf.write(&pf.mutexes.InterfaceGroup)()
 
+	// Check for duplicate interface group name.
+	existingGroups, err := pf.getInterfaceGroups(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w interface groups for duplicate check, %w", ErrGetOperationFailed, err)
+	}
+
+	if _, err := existingGroups.GetByName(req.Name); err == nil {
+		return nil, fmt.Errorf("%w interface group, an interface group with name '%s' already exists", ErrCreateOperationFailed, req.Name)
+	}
+
+	// Validate that all members reference existing interfaces.
+	if len(req.Members) > 0 {
+		ifaces, err := pf.getInterfaces(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("%w interfaces for member validation, %w", ErrGetOperationFailed, err)
+		}
+
+		for _, member := range req.Members {
+			if _, err := ifaces.GetByLogicalName(member); err != nil {
+				return nil, fmt.Errorf("%w interface group, member '%s' does not reference an existing interface", ErrCreateOperationFailed, member)
+			}
+		}
+	}
+
 	membersStr := strings.Join(req.Members, " ")
 
 	command := fmt.Sprintf(
@@ -194,6 +229,20 @@ func (pf *Client) UpdateInterfaceGroup(ctx context.Context, req InterfaceGroup) 
 	controlID, err := groups.GetControlIDByName(req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("%w interface group, %w", ErrGetOperationFailed, err)
+	}
+
+	// Validate that all members reference existing interfaces.
+	if len(req.Members) > 0 {
+		ifaces, err := pf.getInterfaces(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("%w interfaces for member validation, %w", ErrGetOperationFailed, err)
+		}
+
+		for _, member := range req.Members {
+			if _, err := ifaces.GetByLogicalName(member); err != nil {
+				return nil, fmt.Errorf("%w interface group, member '%s' does not reference an existing interface", ErrUpdateOperationFailed, member)
+			}
+		}
 	}
 
 	membersStr := strings.Join(req.Members, " ")

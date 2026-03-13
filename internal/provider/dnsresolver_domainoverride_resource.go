@@ -18,9 +18,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = (*DNSResolverDomainOverrideResource)(nil)
-	_ resource.ResourceWithConfigure   = (*DNSResolverDomainOverrideResource)(nil)
-	_ resource.ResourceWithImportState = (*DNSResolverDomainOverrideResource)(nil)
+	_ resource.Resource                   = (*DNSResolverDomainOverrideResource)(nil)
+	_ resource.ResourceWithConfigure      = (*DNSResolverDomainOverrideResource)(nil)
+	_ resource.ResourceWithImportState    = (*DNSResolverDomainOverrideResource)(nil)
+	_ resource.ResourceWithValidateConfig = (*DNSResolverDomainOverrideResource)(nil)
 )
 
 type DNSResolverDomainOverrideResourceModel struct {
@@ -80,7 +81,7 @@ func (r *DNSResolverDomainOverrideResource) Schema(_ context.Context, _ resource
 				Description: DNSResolverDomainOverrideModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"apply": schema.BoolAttribute{
@@ -91,6 +92,27 @@ func (r *DNSResolverDomainOverrideResource) Schema(_ context.Context, _ resource
 				Default:             booldefault.StaticBool(defaultApply),
 			},
 		},
+	}
+}
+
+func (r *DNSResolverDomainOverrideResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data DNSResolverDomainOverrideResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Cross-field: tls_hostname should only be set when tls_queries is true.
+	if !data.TLSHostname.IsNull() && !data.TLSHostname.IsUnknown() &&
+		!data.TLSQueries.IsNull() && !data.TLSQueries.IsUnknown() {
+		if !data.TLSQueries.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("tls_hostname"),
+				"Invalid TLS hostname configuration",
+				"tls_hostname can only be set when tls_queries is true.",
+			)
+		}
 	}
 }
 

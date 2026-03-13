@@ -61,7 +61,7 @@ func (r *FirewallIPAliasResource) Schema(_ context.Context, _ resource.SchemaReq
 				Description: FirewallIPAliasModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"type": schema.StringAttribute{
@@ -105,7 +105,7 @@ func (r *FirewallIPAliasResource) Schema(_ context.Context, _ resource.SchemaReq
 								stringplanmodifier.UseStateForUnknown(),
 							},
 							Validators: []validator.String{
-								stringvalidator.LengthAtLeast(1),
+								stringvalidator.LengthBetween(1, 200),
 							},
 						},
 					},

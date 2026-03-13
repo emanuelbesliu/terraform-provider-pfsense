@@ -61,7 +61,7 @@ func (r *FirewallPortAliasResource) Schema(_ context.Context, _ resource.SchemaR
 				Description: FirewallPortAliasModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"apply": schema.BoolAttribute{
@@ -94,7 +94,7 @@ func (r *FirewallPortAliasResource) Schema(_ context.Context, _ resource.SchemaR
 								stringplanmodifier.UseStateForUnknown(),
 							},
 							Validators: []validator.String{
-								stringvalidator.LengthAtLeast(1),
+								stringvalidator.LengthBetween(1, 200),
 							},
 						},
 					},

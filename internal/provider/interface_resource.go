@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -19,9 +20,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = (*InterfaceResource)(nil)
-	_ resource.ResourceWithConfigure   = (*InterfaceResource)(nil)
-	_ resource.ResourceWithImportState = (*InterfaceResource)(nil)
+	_ resource.Resource                   = (*InterfaceResource)(nil)
+	_ resource.ResourceWithConfigure      = (*InterfaceResource)(nil)
+	_ resource.ResourceWithImportState    = (*InterfaceResource)(nil)
+	_ resource.ResourceWithValidateConfig = (*InterfaceResource)(nil)
 )
 
 type InterfaceResourceModel struct {
@@ -56,6 +58,9 @@ func (r *InterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"port": schema.StringAttribute{
 				Description: InterfaceModel{}.descriptions()["port"].Description,
 				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
@@ -64,7 +69,7 @@ func (r *InterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: InterfaceModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"enabled": schema.BoolAttribute{
@@ -87,14 +92,14 @@ func (r *InterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: InterfaceModel{}.descriptions()["ipv4_address"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringIsIPAddress("IPv4"),
 				},
 			},
 			"ipv4_subnet": schema.StringAttribute{
 				Description: InterfaceModel{}.descriptions()["ipv4_subnet"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.RegexMatches(subnetV4Regex, "must be a number between 1 and 32"),
 				},
 			},
 			"ipv4_gateway": schema.StringAttribute{
@@ -118,14 +123,14 @@ func (r *InterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: InterfaceModel{}.descriptions()["ipv6_address"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringIsIPAddress("IPv6"),
 				},
 			},
 			"ipv6_subnet": schema.StringAttribute{
 				Description: InterfaceModel{}.descriptions()["ipv6_subnet"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.RegexMatches(subnetV6Regex, "must be a number between 1 and 128"),
 				},
 			},
 			"ipv6_gateway": schema.StringAttribute{
@@ -139,16 +144,22 @@ func (r *InterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: InterfaceModel{}.descriptions()["spoof_mac"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringIsMACAddress(),
 				},
 			},
 			"mtu": schema.Int64Attribute{
 				Description: InterfaceModel{}.descriptions()["mtu"].Description,
 				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.Between(576, 9000),
+				},
 			},
 			"mss": schema.Int64Attribute{
 				Description: InterfaceModel{}.descriptions()["mss"].Description,
 				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.Between(536, 65535),
+				},
 			},
 			"block_private": schema.BoolAttribute{
 				Description: InterfaceModel{}.descriptions()["block_private"].Description,
@@ -170,6 +181,117 @@ func (r *InterfaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Default:             booldefault.StaticBool(defaultApply),
 			},
 		},
+	}
+}
+
+func (r *InterfaceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data InterfaceResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ipv4Type := "none"
+	if !data.IPv4Type.IsNull() && !data.IPv4Type.IsUnknown() {
+		ipv4Type = data.IPv4Type.ValueString()
+	}
+
+	ipv6Type := "none"
+	if !data.IPv6Type.IsNull() && !data.IPv6Type.IsUnknown() {
+		ipv6Type = data.IPv6Type.ValueString()
+	}
+
+	// When ipv4_type is staticv4, ipv4_address and ipv4_subnet are required.
+	if ipv4Type == "staticv4" {
+		if data.IPAddr.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv4_address"),
+				"Missing required attribute",
+				"ipv4_address is required when ipv4_type is 'staticv4'.",
+			)
+		}
+
+		if data.Subnet.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv4_subnet"),
+				"Missing required attribute",
+				"ipv4_subnet is required when ipv4_type is 'staticv4'.",
+			)
+		}
+	}
+
+	// When ipv4_type is NOT staticv4, reject address/subnet/gateway fields.
+	if ipv4Type != "staticv4" {
+		if !data.IPAddr.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv4_address"),
+				"Attribute not applicable",
+				fmt.Sprintf("ipv4_address can only be set when ipv4_type is 'staticv4', current ipv4_type is '%s'.", ipv4Type),
+			)
+		}
+
+		if !data.Subnet.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv4_subnet"),
+				"Attribute not applicable",
+				fmt.Sprintf("ipv4_subnet can only be set when ipv4_type is 'staticv4', current ipv4_type is '%s'.", ipv4Type),
+			)
+		}
+
+		if !data.Gateway.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv4_gateway"),
+				"Attribute not applicable",
+				fmt.Sprintf("ipv4_gateway can only be set when ipv4_type is 'staticv4', current ipv4_type is '%s'.", ipv4Type),
+			)
+		}
+	}
+
+	// When ipv6_type is staticv6, ipv6_address and ipv6_subnet are required.
+	if ipv6Type == "staticv6" {
+		if data.IPAddrV6.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv6_address"),
+				"Missing required attribute",
+				"ipv6_address is required when ipv6_type is 'staticv6'.",
+			)
+		}
+
+		if data.SubnetV6.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv6_subnet"),
+				"Missing required attribute",
+				"ipv6_subnet is required when ipv6_type is 'staticv6'.",
+			)
+		}
+	}
+
+	// When ipv6_type is NOT staticv6, reject address/subnet/gateway fields.
+	if ipv6Type != "staticv6" {
+		if !data.IPAddrV6.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv6_address"),
+				"Attribute not applicable",
+				fmt.Sprintf("ipv6_address can only be set when ipv6_type is 'staticv6', current ipv6_type is '%s'.", ipv6Type),
+			)
+		}
+
+		if !data.SubnetV6.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv6_subnet"),
+				"Attribute not applicable",
+				fmt.Sprintf("ipv6_subnet can only be set when ipv6_type is 'staticv6', current ipv6_type is '%s'.", ipv6Type),
+			)
+		}
+
+		if !data.GatewayV6.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipv6_gateway"),
+				"Attribute not applicable",
+				fmt.Sprintf("ipv6_gateway can only be set when ipv6_type is 'staticv6', current ipv6_type is '%s'.", ipv6Type),
+			)
+		}
 	}
 }
 

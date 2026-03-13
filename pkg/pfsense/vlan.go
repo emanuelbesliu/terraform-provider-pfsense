@@ -3,7 +3,11 @@ package pfsense
 import (
 	"context"
 	"fmt"
+	"regexp"
 )
+
+// parentInterfaceRegex matches physical interface names like vmx0, igb1, em0, etc.
+var parentInterfaceRegex = regexp.MustCompile(`^[a-zA-Z]+\d+$`)
 
 const (
 	MinVLANTag = 1
@@ -33,6 +37,10 @@ type VLAN struct {
 func (v *VLAN) SetParentInterface(iface string) error {
 	if iface == "" {
 		return fmt.Errorf("%w, parent interface is required", ErrClientValidation)
+	}
+
+	if !parentInterfaceRegex.MatchString(iface) {
+		return fmt.Errorf("%w, parent interface must be a physical interface name (e.g. 'vmx0', 'igb1')", ErrClientValidation)
 	}
 
 	v.ParentInterface = iface
@@ -182,12 +190,22 @@ func (pf *Client) GetVLAN(ctx context.Context, vlanif string) (*VLAN, error) {
 func (pf *Client) CreateVLAN(ctx context.Context, req VLAN) (*VLAN, error) {
 	defer pf.write(&pf.mutexes.VLAN)()
 
+	vlanif := fmt.Sprintf("%s.%d", req.ParentInterface, req.Tag)
+
+	// Check for duplicate VLAN (same parent interface + tag).
+	existingVLANs, err := pf.getVLANs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w VLANs for duplicate check, %w", ErrGetOperationFailed, err)
+	}
+
+	if _, err := existingVLANs.GetByInterface(vlanif); err == nil {
+		return nil, fmt.Errorf("%w VLAN, a VLAN with parent '%s' and tag %d already exists (%s)", ErrCreateOperationFailed, req.ParentInterface, req.Tag, vlanif)
+	}
+
 	pcpStr := ""
 	if req.PCP != nil {
 		pcpStr = fmt.Sprintf("%d", *req.PCP)
 	}
-
-	vlanif := fmt.Sprintf("%s.%d", req.ParentInterface, req.Tag)
 
 	command := fmt.Sprintf(
 		"require_once('interfaces.inc');"+

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -11,6 +12,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/marshallford/terraform-provider-pfsense/pkg/pfsense"
 )
+
+// subnetV4Regex matches valid IPv4 subnet prefix lengths (1-32).
+var subnetV4Regex = regexp.MustCompile(`^([1-9]|[12]\d|3[0-2])$`)
+
+// subnetV6Regex matches valid IPv6 subnet prefix lengths (1-128).
+var subnetV6Regex = regexp.MustCompile(`^([1-9]|[1-9]\d|1[01]\d|12[0-8])$`)
 
 type InterfaceModel struct {
 	LogicalName types.String `tfsdk:"logical_name"`
@@ -229,15 +236,30 @@ func (m InterfaceModel) Value(_ context.Context, iface *pfsense.Interface) diag.
 	)
 
 	if !m.IPAddr.IsNull() {
-		iface.IPAddr = m.IPAddr.ValueString()
+		addPathError(
+			&diags,
+			path.Root("ipv4_address"),
+			"IPv4 address cannot be parsed",
+			iface.SetIPAddr(m.IPAddr.ValueString()),
+		)
 	}
 
 	if !m.Subnet.IsNull() {
-		iface.Subnet = m.Subnet.ValueString()
+		addPathError(
+			&diags,
+			path.Root("ipv4_subnet"),
+			"IPv4 subnet cannot be parsed",
+			iface.SetSubnet(m.Subnet.ValueString()),
+		)
 	}
 
 	if !m.Gateway.IsNull() {
-		iface.Gateway = m.Gateway.ValueString()
+		addPathError(
+			&diags,
+			path.Root("ipv4_gateway"),
+			"IPv4 gateway cannot be parsed",
+			iface.SetGateway(m.Gateway.ValueString()),
+		)
 	}
 
 	ipv6Type := "none"
@@ -253,27 +275,57 @@ func (m InterfaceModel) Value(_ context.Context, iface *pfsense.Interface) diag.
 	)
 
 	if !m.IPAddrV6.IsNull() {
-		iface.IPAddrV6 = m.IPAddrV6.ValueString()
+		addPathError(
+			&diags,
+			path.Root("ipv6_address"),
+			"IPv6 address cannot be parsed",
+			iface.SetIPAddrV6(m.IPAddrV6.ValueString()),
+		)
 	}
 
 	if !m.SubnetV6.IsNull() {
-		iface.SubnetV6 = m.SubnetV6.ValueString()
+		addPathError(
+			&diags,
+			path.Root("ipv6_subnet"),
+			"IPv6 subnet cannot be parsed",
+			iface.SetSubnetV6(m.SubnetV6.ValueString()),
+		)
 	}
 
 	if !m.GatewayV6.IsNull() {
-		iface.GatewayV6 = m.GatewayV6.ValueString()
+		addPathError(
+			&diags,
+			path.Root("ipv6_gateway"),
+			"IPv6 gateway cannot be parsed",
+			iface.SetGatewayV6(m.GatewayV6.ValueString()),
+		)
 	}
 
 	if !m.SpoofMAC.IsNull() {
-		iface.SpoofMAC = m.SpoofMAC.ValueString()
+		addPathError(
+			&diags,
+			path.Root("spoof_mac"),
+			"Spoof MAC cannot be parsed",
+			iface.SetSpoofMAC(m.SpoofMAC.ValueString()),
+		)
 	}
 
 	if !m.MTU.IsNull() {
-		iface.MTU = int(m.MTU.ValueInt64())
+		addPathError(
+			&diags,
+			path.Root("mtu"),
+			"MTU cannot be parsed",
+			iface.SetMTU(int(m.MTU.ValueInt64())),
+		)
 	}
 
 	if !m.MSS.IsNull() {
-		iface.MSS = int(m.MSS.ValueInt64())
+		addPathError(
+			&diags,
+			path.Root("mss"),
+			"MSS cannot be parsed",
+			iface.SetMSS(int(m.MSS.ValueInt64())),
+		)
 	}
 
 	iface.BlockPriv = m.BlockPriv.ValueBool()

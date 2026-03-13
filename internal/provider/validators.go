@@ -271,3 +271,28 @@ func (v stringIsNetworkValidator) ValidateString(_ context.Context, req validato
 func stringIsNetwork() stringIsNetworkValidator {
 	return stringIsNetworkValidator{}
 }
+
+type stringIsMACAddressValidator struct{}
+
+var _ validator.String = (*stringIsMACAddressValidator)(nil)
+
+func (v stringIsMACAddressValidator) Description(_ context.Context) string {
+	return "string must be a MAC address"
+}
+
+func (v stringIsMACAddressValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (v stringIsMACAddressValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsUnknown() || req.ConfigValue.IsNull() {
+		return
+	}
+
+	err := pfsense.ValidateMACAddress(req.ConfigValue.ValueString())
+	addPathError(&resp.Diagnostics, req.Path, "Not a valid MAC address", err)
+}
+
+func stringIsMACAddress() stringIsMACAddressValidator {
+	return stringIsMACAddressValidator{}
+}

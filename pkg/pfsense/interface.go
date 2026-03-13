@@ -106,6 +106,100 @@ func (iface *Interface) SetIPv6Type(ipv6Type string) error {
 	return fmt.Errorf("%w, IPv6 type must be one of: %s", ErrClientValidation, strings.Join(InterfaceIPv6Types, ", "))
 }
 
+func (iface *Interface) SetIPAddr(ipAddr string) error {
+	if ipAddr != "" {
+		if err := ValidateIPAddress(ipAddr, "IPv4"); err != nil {
+			return fmt.Errorf("%w, invalid IPv4 address '%s'", ErrClientValidation, ipAddr)
+		}
+	}
+
+	iface.IPAddr = ipAddr
+
+	return nil
+}
+
+func (iface *Interface) SetSubnet(subnet string) error {
+	if subnet != "" {
+		val := 0
+		if _, err := fmt.Sscanf(subnet, "%d", &val); err != nil || val < 1 || val > 32 {
+			return fmt.Errorf("%w, IPv4 subnet prefix length must be between 1 and 32", ErrClientValidation)
+		}
+	}
+
+	iface.Subnet = subnet
+
+	return nil
+}
+
+func (iface *Interface) SetGateway(gateway string) error {
+	iface.Gateway = gateway
+
+	return nil
+}
+
+func (iface *Interface) SetIPAddrV6(ipAddrV6 string) error {
+	if ipAddrV6 != "" {
+		if err := ValidateIPAddress(ipAddrV6, "IPv6"); err != nil {
+			return fmt.Errorf("%w, invalid IPv6 address '%s'", ErrClientValidation, ipAddrV6)
+		}
+	}
+
+	iface.IPAddrV6 = ipAddrV6
+
+	return nil
+}
+
+func (iface *Interface) SetSubnetV6(subnetV6 string) error {
+	if subnetV6 != "" {
+		val := 0
+		if _, err := fmt.Sscanf(subnetV6, "%d", &val); err != nil || val < 1 || val > 128 {
+			return fmt.Errorf("%w, IPv6 subnet prefix length must be between 1 and 128", ErrClientValidation)
+		}
+	}
+
+	iface.SubnetV6 = subnetV6
+
+	return nil
+}
+
+func (iface *Interface) SetGatewayV6(gatewayV6 string) error {
+	iface.GatewayV6 = gatewayV6
+
+	return nil
+}
+
+func (iface *Interface) SetSpoofMAC(mac string) error {
+	if mac != "" {
+		if err := ValidateMACAddress(mac); err != nil {
+			return err
+		}
+	}
+
+	iface.SpoofMAC = mac
+
+	return nil
+}
+
+func (iface *Interface) SetMTU(mtu int) error {
+	if mtu != 0 && (mtu < 576 || mtu > 9000) {
+		return fmt.Errorf("%w, MTU must be between 576 and 9000", ErrClientValidation)
+	}
+
+	iface.MTU = mtu
+
+	return nil
+}
+
+func (iface *Interface) SetMSS(mss int) error {
+	if mss != 0 && (mss < 536 || mss > 65535) {
+		return fmt.Errorf("%w, MSS must be between 536 and 65535", ErrClientValidation)
+	}
+
+	iface.MSS = mss
+
+	return nil
+}
+
 type Interfaces []Interface
 
 func (ifaces Interfaces) GetByLogicalName(name string) (*Interface, error) {
@@ -295,6 +389,18 @@ func (pf *Client) GetInterface(ctx context.Context, logicalName string) (*Interf
 func (pf *Client) CreateInterface(ctx context.Context, req Interface) (*Interface, error) {
 	defer pf.write(&pf.mutexes.Interface)()
 
+	// Check for duplicate port assignment.
+	existingIfaces, err := pf.getInterfaces(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w interfaces for duplicate check, %w", ErrGetOperationFailed, err)
+	}
+
+	for _, existing := range *existingIfaces {
+		if existing.If == req.If {
+			return nil, fmt.Errorf("%w interface, port '%s' is already assigned to interface '%s'", ErrCreateOperationFailed, req.If, existing.LogicalName)
+		}
+	}
+
 	// Add a new interface assignment (assigns next available optN).
 	// Then configure it with the requested settings.
 	command := fmt.Sprintf(
@@ -382,8 +488,27 @@ func (pf *Client) UpdateInterface(ctx context.Context, req Interface) (*Interfac
 		return nil, fmt.Errorf("%w interfaces, %w", ErrGetOperationFailed, err)
 	}
 
-	if _, err := ifaces.GetByLogicalName(req.LogicalName); err != nil {
+	existing, err := ifaces.GetByLogicalName(req.LogicalName)
+	if err != nil {
 		return nil, fmt.Errorf("%w interface, %w", ErrGetOperationFailed, err)
+	}
+
+	// Protect critical system interfaces from destructive changes.
+	if req.LogicalName == "wan" || req.LogicalName == "lan" {
+		if !req.Enabled && existing.Enabled {
+			return nil, fmt.Errorf("%w interface, cannot disable system interface '%s'", ErrUpdateOperationFailed, req.LogicalName)
+		}
+
+		if req.If != existing.If {
+			return nil, fmt.Errorf("%w interface, cannot change the port of system interface '%s' (from '%s' to '%s')", ErrUpdateOperationFailed, req.LogicalName, existing.If, req.If)
+		}
+	}
+
+	// Check for duplicate port assignment (skip self).
+	for _, other := range *ifaces {
+		if other.LogicalName != req.LogicalName && other.If == req.If {
+			return nil, fmt.Errorf("%w interface, port '%s' is already assigned to interface '%s'", ErrUpdateOperationFailed, req.If, other.LogicalName)
+		}
 	}
 
 	command := fmt.Sprintf(
@@ -461,6 +586,7 @@ func (pf *Client) DeleteInterface(ctx context.Context, logicalName string) error
 	}
 
 	// Check for dependencies (groups, bridges, GRE, GIF) and delete the interface.
+	// Also check for firewall and NAT rules referencing this interface.
 	command := fmt.Sprintf(
 		"require_once('interfaces.inc');"+
 			"require_once('filter.inc');"+
@@ -474,25 +600,31 @@ func (pf *Client) DeleteInterface(ctx context.Context, logicalName string) error
 			"print(json_encode('Cannot delete interface: member of interface group ' . $g['ifname']));"+
 			"exit;"+
 			"}}"+
+			// Check for firewall rules referencing this interface.
+			"$rules = config_get_path('filter/rule', array());"+
+			"$ruleCount = 0;"+
+			"foreach ($rules as $rule) {"+
+			"if (isset($rule['interface']) && $rule['interface'] === $ifname) { $ruleCount++; }"+
+			"}"+
+			"if ($ruleCount > 0) {"+
+			"print(json_encode('Cannot delete interface: ' . $ruleCount . ' firewall rule(s) reference interface ' . $ifname . '. Remove them first.'));"+
+			"exit;"+
+			"}"+
+			// Check for NAT rules referencing this interface.
+			"$natrules = config_get_path('nat/rule', array());"+
+			"$natCount = 0;"+
+			"foreach ($natrules as $rule) {"+
+			"if (isset($rule['interface']) && $rule['interface'] === $ifname) { $natCount++; }"+
+			"}"+
+			"if ($natCount > 0) {"+
+			"print(json_encode('Cannot delete interface: ' . $natCount . ' NAT rule(s) reference interface ' . $ifname . '. Remove them first.'));"+
+			"exit;"+
+			"}"+
 			// Delete interface config.
 			"config_del_path('interfaces/' . $ifname);"+
 			// Remove from DHCP.
 			"config_del_path('dhcpd/' . $ifname);"+
 			"config_del_path('dhcpdv6/' . $ifname);"+
-			// Remove firewall rules referencing this interface.
-			"$rules = config_get_path('filter/rule', array());"+
-			"$newrules = array();"+
-			"foreach ($rules as $rule) {"+
-			"if (!isset($rule['interface']) || $rule['interface'] !== $ifname) { $newrules[] = $rule; }"+
-			"}"+
-			"config_set_path('filter/rule', $newrules);"+
-			// Remove NAT rules referencing this interface.
-			"$natrules = config_get_path('nat/rule', array());"+
-			"$newnat = array();"+
-			"foreach ($natrules as $rule) {"+
-			"if (!isset($rule['interface']) || $rule['interface'] !== $ifname) { $newnat[] = $rule; }"+
-			"}"+
-			"config_set_path('nat/rule', $newnat);"+
 			"write_config('Terraform: deleted interface assignment ' . $ifname);"+
 			"print(json_encode(true));",
 		phpEscape(logicalName),

@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = (*DHCPv4StaticMappingResource)(nil)
-	_ resource.ResourceWithConfigure   = (*DHCPv4StaticMappingResource)(nil)
-	_ resource.ResourceWithImportState = (*DHCPv4StaticMappingResource)(nil)
+	_ resource.Resource                   = (*DHCPv4StaticMappingResource)(nil)
+	_ resource.ResourceWithConfigure      = (*DHCPv4StaticMappingResource)(nil)
+	_ resource.ResourceWithImportState    = (*DHCPv4StaticMappingResource)(nil)
+	_ resource.ResourceWithValidateConfig = (*DHCPv4StaticMappingResource)(nil)
 )
 
 type DHCPv4StaticMappingResourceModel struct {
@@ -73,7 +74,7 @@ func (r *DHCPv4StaticMappingResource) Schema(_ context.Context, _ resource.Schem
 				Description: DHCPv4StaticMappingModel{}.descriptions()["client_identifier"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"ip_address": schema.StringAttribute{
@@ -101,7 +102,7 @@ func (r *DHCPv4StaticMappingResource) Schema(_ context.Context, _ resource.Schem
 				Description: DHCPv4StaticMappingModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"wins_servers": schema.ListAttribute{
@@ -168,6 +169,26 @@ func (r *DHCPv4StaticMappingResource) Schema(_ context.Context, _ resource.Schem
 				Default:             booldefault.StaticBool(defaultApply),
 			},
 		},
+	}
+}
+
+func (r *DHCPv4StaticMappingResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data DHCPv4StaticMappingResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Cross-field: arp_table_static_entry = true requires ip_address to be set.
+	if !data.ARPTableStaticEntry.IsNull() && !data.ARPTableStaticEntry.IsUnknown() {
+		if data.ARPTableStaticEntry.ValueBool() && (data.IPAddress.IsNull() || data.IPAddress.IsUnknown()) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("arp_table_static_entry"),
+				"Invalid ARP table static entry configuration",
+				"arp_table_static_entry requires ip_address to be set.",
+			)
+		}
 	}
 }
 

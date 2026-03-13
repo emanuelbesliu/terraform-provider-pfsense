@@ -60,7 +60,7 @@ func (r *DNSResolverConfigFileResource) Schema(_ context.Context, _ resource.Sch
 				MarkdownDescription: DNSResolverConfigFileModel{}.descriptions()["content"].MarkdownDescription,
 				Required:            true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 65535),
 				},
 			},
 			"apply": schema.BoolAttribute{

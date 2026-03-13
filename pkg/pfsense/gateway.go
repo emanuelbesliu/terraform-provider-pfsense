@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 )
+
+var gatewayNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 const (
 	DefaultGatewayWeight = 1
@@ -81,30 +85,74 @@ func (Gateway) IPProtocols() []string {
 }
 
 func (gw *Gateway) SetInterface(iface string) error {
+	if err := ValidateInterface(iface); err != nil {
+		return fmt.Errorf("%w, invalid interface: %w", ErrClientValidation, err)
+	}
+
 	gw.Interface = iface
 
 	return nil
 }
 
 func (gw *Gateway) SetIPProtocol(ipprotocol string) error {
+	valid := false
+	for _, p := range gw.IPProtocols() {
+		if ipprotocol == p {
+			valid = true
+
+			break
+		}
+	}
+
+	if !valid {
+		return fmt.Errorf("%w, ip protocol must be one of: %s", ErrClientValidation, strings.Join(gw.IPProtocols(), ", "))
+	}
+
 	gw.IPProtocol = ipprotocol
 
 	return nil
 }
 
 func (gw *Gateway) SetName(name string) error {
+	if name == "" {
+		return fmt.Errorf("%w, name must not be empty", ErrClientValidation)
+	}
+
+	if len(name) > 31 {
+		return fmt.Errorf("%w, name must be at most 31 characters", ErrClientValidation)
+	}
+
+	if !gatewayNameRegex.MatchString(name) {
+		return fmt.Errorf("%w, name must start with a letter or underscore and contain only alphanumeric characters and underscores", ErrClientValidation)
+	}
+
 	gw.Name = name
 
 	return nil
 }
 
 func (gw *Gateway) SetGatewayIP(gateway string) error {
+	if gateway == "" {
+		return fmt.Errorf("%w, gateway must not be empty", ErrClientValidation)
+	}
+
+	// Accept the literal "dynamic" for DHCP/PPPoE interfaces, or a valid IP address.
+	if gateway != "dynamic" {
+		if err := ValidateIPAddress(gateway, "Any"); err != nil {
+			return fmt.Errorf("%w, gateway must be a valid IP address or 'dynamic': %w", ErrClientValidation, err)
+		}
+	}
+
 	gw.GatewayIP = gateway
 
 	return nil
 }
 
 func (gw *Gateway) SetDescription(description string) error {
+	if len(description) > 200 {
+		return fmt.Errorf("%w, description must be at most 200 characters", ErrClientValidation)
+	}
+
 	gw.Description = description
 
 	return nil
@@ -117,6 +165,12 @@ func (gw *Gateway) SetDisabled(disabled bool) error {
 }
 
 func (gw *Gateway) SetMonitor(monitor string) error {
+	if monitor != "" {
+		if err := ValidateIPAddress(monitor, "Any"); err != nil {
+			return fmt.Errorf("%w, monitor must be a valid IP address: %w", ErrClientValidation, err)
+		}
+	}
+
 	gw.Monitor = monitor
 
 	return nil

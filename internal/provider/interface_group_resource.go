@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -54,6 +55,10 @@ func (r *InterfaceGroupResource) Schema(_ context.Context, _ resource.SchemaRequ
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 15),
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]*$`),
+						"must start with a letter and contain only alphanumeric characters",
+					),
 				},
 			},
 			"members": schema.ListAttribute{
@@ -63,8 +68,9 @@ func (r *InterfaceGroupResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Optional:    true,
 				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.List{
+					listvalidator.UniqueValues(),
 					listvalidator.ValueStringsAre(
-						stringvalidator.LengthAtLeast(1),
+						stringIsInterface(),
 					),
 				},
 			},
@@ -72,7 +78,7 @@ func (r *InterfaceGroupResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Description: InterfaceGroupModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 		},

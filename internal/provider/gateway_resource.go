@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -20,9 +21,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = (*GatewayResource)(nil)
-	_ resource.ResourceWithConfigure   = (*GatewayResource)(nil)
-	_ resource.ResourceWithImportState = (*GatewayResource)(nil)
+	_ resource.Resource                   = (*GatewayResource)(nil)
+	_ resource.ResourceWithConfigure      = (*GatewayResource)(nil)
+	_ resource.ResourceWithImportState    = (*GatewayResource)(nil)
+	_ resource.ResourceWithValidateConfig = (*GatewayResource)(nil)
 )
 
 type GatewayResourceModel struct {
@@ -55,6 +57,10 @@ func (r *GatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 31),
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`),
+						"must start with a letter or underscore and contain only alphanumeric characters and underscores",
+					),
 				},
 			},
 			"interface": schema.StringAttribute{
@@ -76,14 +82,17 @@ func (r *GatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Description: GatewayModel{}.descriptions()["gateway"].Description,
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.Any(
+						stringIsIPAddress("Any"),
+						stringvalidator.OneOf("dynamic"),
+					),
 				},
 			},
 			"description": schema.StringAttribute{
 				Description: GatewayModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"disabled": schema.BoolAttribute{
@@ -227,6 +236,41 @@ func (r *GatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Default:             booldefault.StaticBool(defaultApply),
 			},
 		},
+	}
+}
+
+func (r *GatewayResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data GatewayResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Cross-field: latency_low must be less than latency_high.
+	if !data.LatencyLow.IsNull() && !data.LatencyLow.IsUnknown() &&
+		!data.LatencyHigh.IsNull() && !data.LatencyHigh.IsUnknown() {
+		if data.LatencyLow.ValueInt64() >= data.LatencyHigh.ValueInt64() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("latency_low"),
+				"Invalid latency thresholds",
+				fmt.Sprintf("latency_low (%d) must be less than latency_high (%d).",
+					data.LatencyLow.ValueInt64(), data.LatencyHigh.ValueInt64()),
+			)
+		}
+	}
+
+	// Cross-field: loss_low must be less than loss_high.
+	if !data.LossLow.IsNull() && !data.LossLow.IsUnknown() &&
+		!data.LossHigh.IsNull() && !data.LossHigh.IsUnknown() {
+		if data.LossLow.ValueInt64() >= data.LossHigh.ValueInt64() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("loss_low"),
+				"Invalid loss thresholds",
+				fmt.Sprintf("loss_low (%d) must be less than loss_high (%d).",
+					data.LossLow.ValueInt64(), data.LossHigh.ValueInt64()),
+			)
+		}
 	}
 }
 

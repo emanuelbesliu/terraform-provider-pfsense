@@ -51,7 +51,7 @@ func (r *VLANResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringIsInterface(),
 				},
 			},
 			"tag": schema.Int64Attribute{
@@ -75,7 +75,7 @@ func (r *VLANResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Description: VLANModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"vlan_interface": schema.StringAttribute{

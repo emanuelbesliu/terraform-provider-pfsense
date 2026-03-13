@@ -3,8 +3,11 @@ package pfsense
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var gatewayGroupNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 const (
 	MinGatewayGroupTier = 1
@@ -44,12 +47,28 @@ func (GatewayGroup) KeepFailoverStatesOptions() []string {
 }
 
 func (gw *GatewayGroup) SetName(name string) error {
+	if name == "" {
+		return fmt.Errorf("%w, name must not be empty", ErrClientValidation)
+	}
+
+	if len(name) > 31 {
+		return fmt.Errorf("%w, name must be at most 31 characters", ErrClientValidation)
+	}
+
+	if !gatewayGroupNameRegex.MatchString(name) {
+		return fmt.Errorf("%w, name must start with a letter or underscore and contain only alphanumeric characters and underscores", ErrClientValidation)
+	}
+
 	gw.Name = name
 
 	return nil
 }
 
 func (gw *GatewayGroup) SetDescription(description string) error {
+	if len(description) > 200 {
+		return fmt.Errorf("%w, description must be at most 200 characters", ErrClientValidation)
+	}
+
 	gw.Description = description
 
 	return nil
@@ -468,7 +487,9 @@ func (pf *Client) ApplyGatewayGroupChanges(ctx context.Context) error {
 	return nil
 }
 
-// phpEscape escapes single quotes in strings for safe PHP embedding.
+// phpEscape escapes backslashes and single quotes in strings for safe PHP embedding.
+// Backslashes must be escaped first, then single quotes, to prevent sequences
+// like \\' from breaking out of PHP string context.
 func phpEscape(s string) string {
-	return strings.ReplaceAll(s, "'", "\\'")
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\\", "\\\\"), "'", "\\'")
 }

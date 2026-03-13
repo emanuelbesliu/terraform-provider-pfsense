@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -57,13 +58,17 @@ func (r *GatewayGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 31),
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`),
+						"must start with a letter or underscore and contain only alphanumeric characters and underscores",
+					),
 				},
 			},
 			"description": schema.StringAttribute{
 				Description: GatewayGroupModel{}.descriptions()["description"].Description,
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthBetween(1, 200),
 				},
 			},
 			"trigger": schema.StringAttribute{
