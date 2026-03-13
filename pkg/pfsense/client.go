@@ -57,8 +57,12 @@ type mutexes struct {
 	GatewayApply              sync.Mutex
 	GatewayGroup              sync.RWMutex
 	GatewayGroupApply         sync.Mutex
+	Interface                 sync.RWMutex
+	InterfaceApply            sync.Mutex
+	InterfaceGroup            sync.RWMutex
 	Route                     sync.RWMutex
 	RouteApply                sync.Mutex
+	VLAN                      sync.RWMutex
 }
 
 type Client struct {
