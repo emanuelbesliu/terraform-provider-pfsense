@@ -43,36 +43,38 @@ type Options struct {
 }
 
 type mutexes struct {
-	GlobalWrite               sync.Mutex
-	DHCPv4Apply               sync.Mutex   // TODO one per iface.
-	DHCPv4StaticMapping       sync.RWMutex // TODO one per iface.
-	DNSResolverApply          sync.Mutex
-	DNSResolverConfigFile     sync.RWMutex
-	DNSResolverHostOverride   sync.RWMutex
-	DNSResolverDomainOverride sync.RWMutex
-	ExecutePHPCommand         sync.RWMutex
-	FirewallAlias             sync.RWMutex
-	FirewallFilterReload      sync.Mutex
-	Gateway                   sync.RWMutex
-	GatewayApply              sync.Mutex
-	GatewayGroup              sync.RWMutex
-	GatewayGroupApply         sync.Mutex
-	Interface                 sync.RWMutex
-	InterfaceApply            sync.Mutex
-	InterfaceGroup            sync.RWMutex
-	Route                     sync.RWMutex
-	RouteApply                sync.Mutex
-	SystemGeneral             sync.RWMutex
-	SystemGeneralApply        sync.Mutex
-	AdvancedAdmin             sync.RWMutex
-	AdvancedAdminApply        sync.Mutex
-	AdvancedFirewall          sync.RWMutex
-	AdvancedFirewallApply     sync.Mutex
-	AdvancedMisc              sync.RWMutex
-	AdvancedMiscApply         sync.Mutex
-	AdvancedNetworking        sync.RWMutex
-	AdvancedNetworkingApply   sync.Mutex
-	VLAN                      sync.RWMutex
+	GlobalWrite                sync.Mutex
+	DHCPv4Apply                sync.Mutex   // TODO one per iface.
+	DHCPv4StaticMapping        sync.RWMutex // TODO one per iface.
+	DNSResolverApply           sync.Mutex
+	DNSResolverConfigFile      sync.RWMutex
+	DNSResolverHostOverride    sync.RWMutex
+	DNSResolverDomainOverride  sync.RWMutex
+	ExecutePHPCommand          sync.RWMutex
+	FirewallAlias              sync.RWMutex
+	FirewallFilterReload       sync.Mutex
+	Gateway                    sync.RWMutex
+	GatewayApply               sync.Mutex
+	GatewayGroup               sync.RWMutex
+	GatewayGroupApply          sync.Mutex
+	Interface                  sync.RWMutex
+	InterfaceApply             sync.Mutex
+	InterfaceGroup             sync.RWMutex
+	Route                      sync.RWMutex
+	RouteApply                 sync.Mutex
+	SystemGeneral              sync.RWMutex
+	SystemGeneralApply         sync.Mutex
+	AdvancedAdmin              sync.RWMutex
+	AdvancedAdminApply         sync.Mutex
+	AdvancedFirewall           sync.RWMutex
+	AdvancedFirewallApply      sync.Mutex
+	AdvancedMisc               sync.RWMutex
+	AdvancedMiscApply          sync.Mutex
+	AdvancedNetworking         sync.RWMutex
+	AdvancedNetworkingApply    sync.Mutex
+	AdvancedNotifications      sync.RWMutex
+	AdvancedNotificationsApply sync.Mutex
+	VLAN                       sync.RWMutex
 }
 
 type Client struct {

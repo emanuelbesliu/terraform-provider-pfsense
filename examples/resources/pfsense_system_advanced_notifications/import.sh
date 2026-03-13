@@ -1,0 +1,1 @@
+terraform import pfsense_system_advanced_notifications.example notifications
