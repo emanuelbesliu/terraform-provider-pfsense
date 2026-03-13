@@ -130,10 +130,6 @@ func (pf *Client) getFirewallIPAliases(ctx context.Context) (*FirewallIPAliases,
 		ips := safeSplit(resp.Addresses, aliasEntryAddressSep)
 		descriptions := safeSplit(resp.Details, aliasEntryDescriptionSep)
 
-		if len(ips) != len(descriptions) {
-			return nil, fmt.Errorf("%w, ips and descriptions do not match", unableToParseResErr)
-		}
-
 		for index := range ips {
 			var entry FirewallIPAliasEntry
 			var err error
@@ -143,9 +139,11 @@ func (pf *Client) getFirewallIPAliases(ctx context.Context) (*FirewallIPAliases,
 				return nil, fmt.Errorf("%w, %w", unableToParseResErr, err)
 			}
 
-			err = entry.SetDescription(descriptions[index])
-			if err != nil {
-				return nil, fmt.Errorf("%w, %w", unableToParseResErr, err)
+			if index < len(descriptions) && descriptions[index] != "" {
+				err = entry.SetDescription(descriptions[index])
+				if err != nil {
+					return nil, fmt.Errorf("%w, %w", unableToParseResErr, err)
+				}
 			}
 
 			ipAlias.Entries = append(ipAlias.Entries, entry)
