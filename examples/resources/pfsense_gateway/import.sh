@@ -1,0 +1,1 @@
+terraform import pfsense_gateway.example gateway_name
