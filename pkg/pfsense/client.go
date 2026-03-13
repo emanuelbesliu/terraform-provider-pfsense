@@ -78,6 +78,8 @@ type mutexes struct {
 	SystemTunableApply         sync.Mutex
 	User                       sync.RWMutex
 	UserApply                  sync.Mutex
+	Group                      sync.RWMutex
+	GroupApply                 sync.Mutex
 	VLAN                       sync.RWMutex
 }
 
