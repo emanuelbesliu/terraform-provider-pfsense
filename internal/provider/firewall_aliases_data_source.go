@@ -19,6 +19,7 @@ var (
 type FirewallAliasesModel struct {
 	IP   types.List `tfsdk:"ip"`
 	Port types.List `tfsdk:"port"`
+	URL  types.List `tfsdk:"url"`
 }
 
 func NewFirewallAliasesDataSource() datasource.DataSource { //nolint:ireturn
@@ -29,7 +30,7 @@ type FirewallAliasesDataSource struct {
 	client *pfsense.Client
 }
 
-func (m *FirewallAliasesModel) Set(ctx context.Context, ipAliases pfsense.FirewallIPAliases, portAliases pfsense.FirewallPortAliases) diag.Diagnostics {
+func (m *FirewallAliasesModel) Set(ctx context.Context, ipAliases pfsense.FirewallIPAliases, portAliases pfsense.FirewallPortAliases, urlAliases pfsense.FirewallURLAliases) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	ipAliasModels := []FirewallIPAliasModel{}
@@ -53,6 +54,17 @@ func (m *FirewallAliasesModel) Set(ctx context.Context, ipAliases pfsense.Firewa
 	portAliasesValue, newDiags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: FirewallPortAliasModel{}.AttrTypes()}, portAliasModels)
 	diags.Append(newDiags...)
 	m.Port = portAliasesValue
+
+	urlAliasModels := []FirewallURLAliasModel{}
+	for _, urlAlias := range urlAliases {
+		var urlAliasModel FirewallURLAliasModel
+		diags.Append(urlAliasModel.Set(ctx, urlAlias)...)
+		urlAliasModels = append(urlAliasModels, urlAliasModel)
+	}
+
+	urlAliasesValue, newDiags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: FirewallURLAliasModel{}.AttrTypes()}, urlAliasModels)
+	diags.Append(newDiags...)
+	m.URL = urlAliasesValue
 
 	return diags
 }
@@ -135,6 +147,47 @@ func (d *FirewallAliasesDataSource) Schema(_ context.Context, _ datasource.Schem
 					},
 				},
 			},
+			"url": schema.ListNestedAttribute{
+				Description: "URL aliases (URLs importing hosts, networks, or ports).",
+				Computed:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: FirewallURLAliasModel{}.descriptions()["name"].Description,
+							Computed:    true,
+						},
+						"description": schema.StringAttribute{
+							Description: FirewallURLAliasModel{}.descriptions()["description"].Description,
+							Computed:    true,
+						},
+						"type": schema.StringAttribute{
+							Description:         FirewallURLAliasModel{}.descriptions()["type"].Description,
+							MarkdownDescription: FirewallURLAliasModel{}.descriptions()["type"].MarkdownDescription,
+							Computed:            true,
+						},
+						"update_frequency": schema.Int64Attribute{
+							Description: FirewallURLAliasModel{}.descriptions()["update_frequency"].Description,
+							Computed:    true,
+						},
+						"entries": schema.ListNestedAttribute{
+							Description: FirewallURLAliasModel{}.descriptions()["entries"].Description,
+							Computed:    true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"url": schema.StringAttribute{
+										Description: FirewallURLAliasEntryModel{}.descriptions()["url"].Description,
+										Computed:    true,
+									},
+									"description": schema.StringAttribute{
+										Description: FirewallURLAliasEntryModel{}.descriptions()["description"].Description,
+										Computed:    true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -157,11 +210,16 @@ func (d *FirewallAliasesDataSource) Read(ctx context.Context, _ datasource.ReadR
 	}
 
 	portAliases, err := d.client.GetFirewallPortAliases(ctx)
-	if addError(&resp.Diagnostics, "Unable to get IP aliases", err) {
+	if addError(&resp.Diagnostics, "Unable to get port aliases", err) {
 		return
 	}
 
-	resp.Diagnostics.Append(data.Set(ctx, *ipAliases, *portAliases)...)
+	urlAliases, err := d.client.GetFirewallURLAliases(ctx)
+	if addError(&resp.Diagnostics, "Unable to get URL aliases", err) {
+		return
+	}
+
+	resp.Diagnostics.Append(data.Set(ctx, *ipAliases, *portAliases, *urlAliases)...)
 
 	if resp.Diagnostics.HasError() {
 		return

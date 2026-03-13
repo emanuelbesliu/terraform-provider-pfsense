@@ -7,3 +7,7 @@ output "firewall_ip_aliases" {
 output "firewall_port_aliases" {
   value = data.pfsense_firewall_aliases.this.port
 }
+
+output "firewall_url_aliases" {
+  value = data.pfsense_firewall_aliases.this.url
+}
