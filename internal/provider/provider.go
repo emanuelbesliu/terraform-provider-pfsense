@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -13,6 +14,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/marshallford/terraform-provider-pfsense/pkg/pfsense"
+)
+
+const (
+	envURL      = "TF_PFSENSE_URL"
+	envUsername = "TF_PFSENSE_USERNAME"
+	envPassword = "TF_PFSENSE_PASSWORD"
 )
 
 var _ provider.Provider = (*pfSenseProvider)(nil)
@@ -46,22 +53,23 @@ func (p *pfSenseProvider) Metadata(_ context.Context, _ provider.MetadataRequest
 func (p *pfSenseProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description:         "Interact with pfSense firewall/router.",
-		MarkdownDescription: "Interact with [pfSense](https://www.pfsense.org/) firewall/router.",
+		MarkdownDescription: "Interact with [pfSense](https://www.pfsense.org/) firewall/router.\n\nCredentials can be provided via provider configuration or environment variables. Environment variables are used as fallback when the corresponding attribute is not set in the provider block. This is useful for CI/CD pipelines where sensitive values should not be stored in source control.\n\n| Attribute | Environment Variable | Default |\n|---|---|---|\n| `url` | `TF_PFSENSE_URL` | `" + pfsense.DefaultURL + "` |\n| `username` | `TF_PFSENSE_USERNAME` | `" + pfsense.DefaultUsername + "` |\n| `password` | `TF_PFSENSE_PASSWORD` | _(required)_ |",
 		Attributes: map[string]schema.Attribute{
 			"url": schema.StringAttribute{
-				Description:         fmt.Sprintf("pfSense administration URL, defaults to '%s'.", pfsense.DefaultURL),
-				MarkdownDescription: fmt.Sprintf("pfSense administration URL, defaults to `%s`.", pfsense.DefaultURL),
+				Description:         fmt.Sprintf("pfSense administration URL. Can also be set with the %s environment variable. Defaults to '%s'.", envURL, pfsense.DefaultURL),
+				MarkdownDescription: fmt.Sprintf("pfSense administration URL. Can also be set with the `%s` environment variable. Defaults to `%s`.", envURL, pfsense.DefaultURL),
 				Optional:            true,
 			},
 			"username": schema.StringAttribute{
-				Description:         fmt.Sprintf("pfSense administration username, defaults to '%s'.", pfsense.DefaultUsername),
-				MarkdownDescription: fmt.Sprintf("pfSense administration username, defaults to `%s`.", pfsense.DefaultUsername),
+				Description:         fmt.Sprintf("pfSense administration username. Can also be set with the %s environment variable. Defaults to '%s'.", envUsername, pfsense.DefaultUsername),
+				MarkdownDescription: fmt.Sprintf("pfSense administration username. Can also be set with the `%s` environment variable. Defaults to `%s`.", envUsername, pfsense.DefaultUsername),
 				Optional:            true,
 			},
 			"password": schema.StringAttribute{
-				Description: "pfSense administration password.",
-				Required:    true,
-				Sensitive:   true,
+				Description:         fmt.Sprintf("pfSense administration password. Can also be set with the %s environment variable.", envPassword),
+				MarkdownDescription: fmt.Sprintf("pfSense administration password. Can also be set with the `%s` environment variable.", envPassword),
+				Optional:            true,
+				Sensitive:           true,
 			},
 			"tls_skip_verify": schema.BoolAttribute{
 				Description:         fmt.Sprintf("Skip verification of TLS certificates, defaults to '%t'.", pfsense.DefaultTLSSkipVerify),
@@ -133,10 +141,47 @@ func (p *pfSenseProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
+	// Resolve URL: HCL config > env var > client default
+	urlValue := data.URL.ValueString()
+	if data.URL.IsNull() || data.URL.ValueString() == "" {
+		if v, ok := os.LookupEnv(envURL); ok {
+			urlValue = v
+			tflog.Debug(ctx, fmt.Sprintf("Using %s environment variable for URL", envURL))
+		}
+	}
+
+	// Resolve username: HCL config > env var > client default
+	usernameValue := data.Username.ValueString()
+	if data.Username.IsNull() || data.Username.ValueString() == "" {
+		if v, ok := os.LookupEnv(envUsername); ok {
+			usernameValue = v
+			tflog.Debug(ctx, fmt.Sprintf("Using %s environment variable for username", envUsername))
+		}
+	}
+
+	// Resolve password: HCL config > env var (no default — required)
+	passwordValue := data.Password.ValueString()
+	if data.Password.IsNull() || data.Password.ValueString() == "" {
+		if v, ok := os.LookupEnv(envPassword); ok {
+			passwordValue = v
+			tflog.Debug(ctx, fmt.Sprintf("Using %s environment variable for password", envPassword))
+		}
+	}
+
+	if passwordValue == "" {
+		resp.Diagnostics.AddError(
+			"Missing pfSense password",
+			fmt.Sprintf("The provider cannot find a password for pfSense. "+
+				"Set the password in the provider configuration or use the %s environment variable.", envPassword),
+		)
+
+		return
+	}
+
 	var opts pfsense.Options
 
-	if !data.URL.IsNull() {
-		url, err := url.Parse(data.URL.ValueString())
+	if urlValue != "" {
+		url, err := url.Parse(urlValue)
 		if err != nil {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("url"),
@@ -148,11 +193,11 @@ func (p *pfSenseProvider) Configure(ctx context.Context, req provider.ConfigureR
 		opts.URL = url
 	}
 
-	if !data.Username.IsNull() {
-		opts.Username = data.Username.ValueString()
+	if usernameValue != "" {
+		opts.Username = usernameValue
 	}
 
-	opts.Password = data.Password.ValueString()
+	opts.Password = passwordValue
 
 	if !data.TLSSkipVerify.IsNull() {
 		opts.TLSSkipVerify = data.TLSSkipVerify.ValueBoolPointer()

@@ -17,3 +17,13 @@ provider "pfsense" {
   username = "some-user"
   password = var.pfsense_password
 }
+
+# using environment variables (TF_PFSENSE_URL, TF_PFSENSE_USERNAME, TF_PFSENSE_PASSWORD)
+# useful for CI/CD pipelines where credentials should not be in source control
+provider "pfsense" {}
+
+# mixed: URL in config, credentials from environment variables
+provider "pfsense" {
+  url             = "https://pfsense.lan"
+  tls_skip_verify = true
+}
