@@ -298,7 +298,8 @@ func parseGatewayResponse(resp gatewayResponse, index int) (Gateway, error) {
 	}
 
 	gw.Disabled = resp.Disabled != nil
-	gw.DefaultGW = resp.DefaultGW != nil
+	// DefaultGW is determined by the system-level defaultgw4/defaultgw6 config,
+	// not the per-gateway legacy flag. Set by the caller (getGateways).
 	gw.MonitorDisable = resp.MonitorDisable != nil
 	gw.ActionDisable = resp.ActionDisable != nil
 	gw.ForceDown = resp.ForceDown != nil
@@ -377,24 +378,44 @@ func parseIntField(raw string, defaultVal int, setter func(int) error) error {
 	return setter(val)
 }
 
+type gatewaysWithDefaults struct {
+	DefaultGW4   string            `json:"defaultgw4"`
+	DefaultGW6   string            `json:"defaultgw6"`
+	GatewayItems []gatewayResponse `json:"gateway_items"`
+}
+
 func (pf *Client) getGateways(ctx context.Context) (*Gateways, error) {
-	command := "$output = array();" +
+	command := "$items = array();" +
 		"if (isset($config['gateways']['gateway_item']) && is_array($config['gateways']['gateway_item'])) {" +
 		"foreach ($config['gateways']['gateway_item'] as $k => $v) {" +
-		"$v['controlID'] = $k; array_push($output, $v);" +
+		"$v['controlID'] = $k; array_push($items, $v);" +
 		"}};" +
-		"print_r(json_encode($output));"
+		"$out = array(" +
+		"'defaultgw4' => isset($config['gateways']['defaultgw4']) ? $config['gateways']['defaultgw4'] : ''," +
+		"'defaultgw6' => isset($config['gateways']['defaultgw6']) ? $config['gateways']['defaultgw6'] : ''," +
+		"'gateway_items' => $items" +
+		");" +
+		"print_r(json_encode($out));"
 
-	var gatewayResp []gatewayResponse
-	if err := pf.executePHPCommand(ctx, command, &gatewayResp); err != nil {
+	var resp gatewaysWithDefaults
+	if err := pf.executePHPCommand(ctx, command, &resp); err != nil {
 		return nil, err
 	}
 
-	gateways := make(Gateways, 0, len(gatewayResp))
-	for _, resp := range gatewayResp {
-		gw, err := parseGatewayResponse(resp, resp.ControlID)
+	gateways := make(Gateways, 0, len(resp.GatewayItems))
+	for _, gwResp := range resp.GatewayItems {
+		gw, err := parseGatewayResponse(gwResp, gwResp.ControlID)
 		if err != nil {
 			return nil, fmt.Errorf("%w gateway response, %w", ErrUnableToParse, err)
+		}
+
+		// Determine default gateway status from system-level config, not the
+		// per-gateway legacy flag (which is stripped by return_gateways_array).
+		switch gw.IPProtocol {
+		case "inet":
+			gw.DefaultGW = resp.DefaultGW4 == gw.Name
+		case "inet6":
+			gw.DefaultGW = resp.DefaultGW6 == gw.Name
 		}
 
 		gateways = append(gateways, gw)
@@ -564,6 +585,10 @@ func (pf *Client) CreateGateway(ctx context.Context, gwReq Gateway) (*Gateway, e
 		return nil, fmt.Errorf("%w gateway, %w", ErrCreateOperationFailed, err)
 	}
 
+	if err := pf.ensureDefaultGateway(ctx, gwReq.Name, gwReq.IPProtocol, gwReq.DefaultGW); err != nil {
+		return nil, fmt.Errorf("%w gateway, %w", ErrCreateOperationFailed, err)
+	}
+
 	gateways, err := pf.getGateways(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%w gateways after creating, %w", ErrGetOperationFailed, err)
@@ -586,6 +611,10 @@ func (pf *Client) UpdateGateway(ctx context.Context, gwReq Gateway) (*Gateway, e
 	}
 
 	if err := pf.createOrUpdateGateway(ctx, gwReq, editID); err != nil {
+		return nil, fmt.Errorf("%w gateway, %w", ErrUpdateOperationFailed, err)
+	}
+
+	if err := pf.ensureDefaultGateway(ctx, gwReq.Name, gwReq.IPProtocol, gwReq.DefaultGW); err != nil {
 		return nil, fmt.Errorf("%w gateway, %w", ErrUpdateOperationFailed, err)
 	}
 
@@ -630,6 +659,47 @@ func (pf *Client) DeleteGateway(ctx context.Context, name string) error {
 
 	if _, err := gateways.GetByName(name); err == nil {
 		return fmt.Errorf("%w gateway, still exists", ErrDeleteOperationFailed)
+	}
+
+	return nil
+}
+
+// ensureDefaultGateway ensures that the system-level default gateway config
+// (defaultgw4 / defaultgw6) matches the desired state for the given gateway.
+// When setDefault is true and the form POST to save_gateway() already handled
+// it, this is a no-op (save_gateway sets defaultgw4/6 when defaultgw=yes).
+// When setDefault is false and the gateway IS currently the system default,
+// this clears the system default to "" (Automatic).
+func (pf *Client) ensureDefaultGateway(ctx context.Context, name string, ipProtocol string, setDefault bool) error {
+	if setDefault {
+		// save_gateway() already sets defaultgw4/defaultgw6 when defaultgw=yes
+		// is in the form POST. Nothing else to do.
+		return nil
+	}
+
+	// Need to check if this gateway IS currently the system default and clear it.
+	configKey := "defaultgw4"
+	if ipProtocol == "inet6" {
+		configKey = "defaultgw6"
+	}
+
+	// Read the current system default, clear it only if it matches this gateway.
+	command := fmt.Sprintf(
+		"$key = '%s';"+
+			"$current = config_get_path('gateways/' . $key, '');"+
+			"if ($current === '%s') {"+
+			"config_set_path('gateways/' . $key, '');"+
+			"write_config('Terraform: cleared default gateway');"+
+			"print(json_encode(true));"+
+			"} else {"+
+			"print(json_encode(false));"+
+			"}",
+		configKey, name,
+	)
+
+	var changed bool
+	if err := pf.executePHPCommand(ctx, command, &changed); err != nil {
+		return fmt.Errorf("failed to clear default gateway for %s, %w", name, err)
 	}
 
 	return nil
