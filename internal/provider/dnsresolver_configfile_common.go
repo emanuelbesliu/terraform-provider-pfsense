@@ -10,6 +10,10 @@ import (
 	"github.com/marshallford/terraform-provider-pfsense/pkg/pfsense"
 )
 
+type DNSResolverConfigFilesModel struct {
+	All types.List `tfsdk:"all"`
+}
+
 type DNSResolverConfigFileModel struct {
 	Name    types.String `tfsdk:"name"`
 	Content types.String `tfsdk:"content"`
@@ -32,6 +36,23 @@ func (DNSResolverConfigFileModel) AttrTypes() map[string]attr.Type {
 		"name":    types.StringType,
 		"content": types.StringType,
 	}
+}
+
+func (m *DNSResolverConfigFilesModel) Set(ctx context.Context, configFiles pfsense.ConfigFiles) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	configFileModels := []DNSResolverConfigFileModel{}
+	for _, configFile := range configFiles {
+		var configFileModel DNSResolverConfigFileModel
+		diags.Append(configFileModel.Set(ctx, configFile)...)
+		configFileModels = append(configFileModels, configFileModel)
+	}
+
+	configFilesValue, newDiags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: DNSResolverConfigFileModel{}.AttrTypes()}, configFileModels)
+	diags.Append(newDiags...)
+	m.All = configFilesValue
+
+	return diags
 }
 
 func (r *DNSResolverConfigFileModel) Set(_ context.Context, configFile pfsense.ConfigFile) diag.Diagnostics {
