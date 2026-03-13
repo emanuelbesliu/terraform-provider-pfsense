@@ -217,17 +217,14 @@ func (p *pfSenseProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 func (p *pfSenseProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewDNSResolverApplyResource,
 		NewDNSResolverConfigFileResource,
 		NewDNSResolverDomainOverrideResource,
 		NewDNSResolverHostOverrideResource,
-		NewFirewallFilterReloadResource,
 		NewFirewallIPAliasResource,
 		NewFirewallPortAliasResource,
 		NewGatewayResource,
 		NewGatewayGroupResource,
 		NewRouteResource,
-		NewDHCPv4ApplyResource,
 		NewDHCPv4StaticMappingResource,
 		NewExecutePHPCommandResource,
 	}
