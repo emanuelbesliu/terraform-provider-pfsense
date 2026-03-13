@@ -276,6 +276,8 @@ func (p *pfSenseProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewSystemTunableDataSource,
 		NewSystemTunablesDataSource,
 		NewSystemVersionDataSource,
+		NewUserDataSource,
+		NewUsersDataSource,
 		NewVLANDataSource,
 		NewVLANsDataSource,
 	}
@@ -300,6 +302,7 @@ func (p *pfSenseProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewSystemAdvancedNetworkingResource,
 		NewSystemGeneralResource,
 		NewSystemTunableResource,
+		NewUserResource,
 		NewVLANResource,
 		NewDHCPv4StaticMappingResource,
 		NewExecutePHPCommandResource,
