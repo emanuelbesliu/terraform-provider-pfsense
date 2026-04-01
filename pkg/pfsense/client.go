@@ -82,6 +82,7 @@ type mutexes struct {
 	Group                      sync.RWMutex
 	GroupApply                 sync.Mutex
 	AuthServer                 sync.RWMutex
+	CronJob                    sync.RWMutex
 	VLAN                       sync.RWMutex
 }
 
