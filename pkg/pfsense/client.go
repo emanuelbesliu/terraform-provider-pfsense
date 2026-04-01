@@ -45,6 +45,7 @@ type Options struct {
 type mutexes struct {
 	GlobalWrite                sync.Mutex
 	DHCPv4Apply                sync.Mutex   // TODO one per iface.
+	DHCPv4Server               sync.RWMutex // TODO one per iface.
 	DHCPv4StaticMapping        sync.RWMutex // TODO one per iface.
 	DNSResolverApply           sync.Mutex
 	DNSResolverConfigFile      sync.RWMutex

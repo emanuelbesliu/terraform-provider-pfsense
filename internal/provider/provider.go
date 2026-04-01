@@ -249,6 +249,7 @@ func (p *pfSenseProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewAuthServersDataSource,
 		NewCronJobDataSource,
 		NewCronJobsDataSource,
+		NewDHCPv4ServerDataSource,
 		NewDHCPv4StaticMappingDataSource,
 		NewDHCPv4StaticMappingsDataSource,
 		NewDNSResolverConfigFileDataSource,
@@ -296,6 +297,7 @@ func (p *pfSenseProvider) Resources(_ context.Context) []func() resource.Resourc
 	return []func() resource.Resource{
 		NewAuthServerResource,
 		NewCronJobResource,
+		NewDHCPv4ServerResource,
 		NewDNSResolverConfigFileResource,
 		NewDNSResolverDomainOverrideResource,
 		NewDNSResolverHostOverrideResource,
