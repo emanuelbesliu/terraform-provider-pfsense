@@ -40,8 +40,6 @@ resource "pfsense_dnsresolver_configfile" "example" {
 
 Import is supported using the following syntax:
 
-The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
-
 ```shell
 # specify filename without '.conf' extension
 terraform import pfsense_dnsresolver_configfile.example some-filename

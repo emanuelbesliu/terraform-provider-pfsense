@@ -58,8 +58,6 @@ resource "pfsense_interface" "example" {
 
 Import is supported using the following syntax:
 
-The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
-
 ```shell
 # Import an interface by its logical name (e.g. opt1, opt2)
 terraform import pfsense_interface.example opt1

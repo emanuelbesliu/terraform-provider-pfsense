@@ -61,8 +61,6 @@ resource "pfsense_static_route" "via_backup" {
 
 Import is supported using the following syntax:
 
-The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
-
 ```shell
 # Import format: network_cidr/gateway_name
 terraform import pfsense_static_route.example 10.10.0.0/24/WAN_GW

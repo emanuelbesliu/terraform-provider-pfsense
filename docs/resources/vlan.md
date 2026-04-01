@@ -42,8 +42,6 @@ resource "pfsense_vlan" "example" {
 
 Import is supported using the following syntax:
 
-The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
-
 ```shell
 # Import a VLAN by its interface name (parent.tag format)
 terraform import pfsense_vlan.example igb0.100
