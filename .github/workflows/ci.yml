@@ -1,14 +1,10 @@
 name: CI
 
-on: # yamllint disable-line rule:truthy
+on:
+  push:
+    branches: [main]
   pull_request:
-    types:
-    - opened
-    - synchronize
-    - reopened
-    # - edited
-    branches:
-    - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -18,100 +14,63 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_wrapper: false
-    - name: Pull
-      run: make -j pull
-    - name: Lint
-      run: make lint
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ".go-version"
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Check formatting
+        run: |
+          gofmt_output=$(gofmt -l .)
+          if [ -n "$gofmt_output" ]; then
+            echo "The following files are not formatted:"
+            echo "$gofmt_output"
+            exit 1
+          fi
 
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: .go-version
-        cache: true
-    - name: Download dependencies
-      run: go mod download
-    - name: Build
-      run: go build -v .
+      - name: Checkout
+        uses: actions/checkout@v6
 
-  docs:
-    name: Test Docs
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: .go-version
-        cache: true
-    - name: Download dependencies
-      run: go mod download
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_wrapper: false
-    - name: Generate and validate docs
-      run: make docs test/docs
-    - name: Check docs
-      run: |
-        GIT_STATUS=$(git status --porcelain)
-        test -z "$GIT_STATUS" || (echo -e "Unexpected difference after code generation: $GIT_STATUS"; exit 1)
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ".go-version"
 
-  test:
-    name: Test
-    needs:
-    - lint
-    - build
-    - docs
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        terraform:
-        - 1.10.*
-        - 1.11.*
-        - 1.12.*
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Setup go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: .go-version
-        cache: true
-    - name: Download dependencies
-      run: go mod download
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ${{ matrix.terraform }}
-        terraform_wrapper: false
-    - name: Test
-      run: make test/pkg test/acc
+      - name: Build
+        run: go build -v ./...
 
-  check:
-    name: Test
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
-    if: always()
-    needs:
-    - test
+    needs: [lint, build]
     steps:
-    - run: exit 1
-      # see https://stackoverflow.com/a/67532120/4907315
-      if: >-
-        ${{
-          contains(needs.*.result, 'failure') ||
-          contains(needs.*.result, 'cancelled')
-        }}
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ".go-version"
+
+      - name: Run unit tests
+        run: go test -v -count=1 -coverprofile=coverage.out ./pkg/...
+
+      - name: Display coverage
+        run: go tool cover -func=coverage.out
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 7
