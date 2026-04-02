@@ -462,7 +462,7 @@ func (pf *Client) getDHCPv4Server(ctx context.Context, iface string) (*DHCPv4Ser
 			"'ddnsclientupdates' => isset($dhcpd['ddnsclientupdates']) ? $dhcpd['ddnsclientupdates'] : ''"+
 			");"+
 			"print(json_encode($out));",
-		iface,
+		phpEscape(iface),
 	)
 
 	var resp dhcpv4ServerResponse

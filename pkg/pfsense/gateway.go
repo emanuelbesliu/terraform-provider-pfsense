@@ -748,7 +748,7 @@ func (pf *Client) ensureDefaultGateway(ctx context.Context, name string, ipProto
 			"} else {"+
 			"print(json_encode(false));"+
 			"}",
-		configKey, name,
+		configKey, phpEscape(name),
 	)
 
 	var changed bool
