@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.2](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.1...v0.43.2) (2026-04-02)
+
+
+### Bug Fixes
+
+* improve IPsec Phase 2 reliability and fix keepalive handling ([50613e8](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/50613e846535f3d54835f08881945a09b341fc30))
+
 ## [0.43.1](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.0...v0.43.1) (2026-04-02)
 
 
