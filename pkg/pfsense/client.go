@@ -48,7 +48,9 @@ type mutexes struct {
 	DHCPv4Server               sync.RWMutex // TODO one per iface.
 	DHCPv4StaticMapping        sync.RWMutex // TODO one per iface.
 	DNSResolverApply           sync.Mutex
+	DNSResolverAdvanced        sync.RWMutex
 	DNSResolverConfigFile      sync.RWMutex
+	DNSResolverGeneral         sync.RWMutex
 	DNSResolverHostOverride    sync.RWMutex
 	DNSResolverDomainOverride  sync.RWMutex
 	ExecutePHPCommand          sync.RWMutex
