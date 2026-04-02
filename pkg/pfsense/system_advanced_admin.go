@@ -164,7 +164,7 @@ func (a *AdvancedAdmin) SetSSHPort(port int) error {
 // advancedAdminResponse is the JSON shape returned by the PHP read command.
 type advancedAdminResponse struct {
 	WebGUI             *webguiAdminResponse `json:"webgui"`
-	SSH                *sshAdminResponse    `json:"ssh"`
+	SSH                json.RawMessage      `json:"ssh"`
 	SerialSpeed        json.RawMessage      `json:"serialspeed"`
 	PrimaryConsole     json.RawMessage      `json:"primaryconsole"`
 	EnableSerial       json.RawMessage      `json:"enableserial"`
@@ -279,26 +279,36 @@ func parseAdvancedAdminResponse(resp advancedAdminResponse) (AdvancedAdmin, erro
 		a.Roaming = true // pfSense defaults to enabled
 	}
 
-	// SSH
-	if resp.SSH != nil {
-		ssh := resp.SSH
-		a.SSHEnabled = (ssh.Enable == "enabled")
+	// SSH — handle both object and string/null formats.
+	// pfSense may return the ssh config as an object {"enable":"enabled",...}
+	// or as a simple string "enabled" or "" depending on version/config state.
+	if len(resp.SSH) > 0 && string(resp.SSH) != "null" {
+		// Try to unmarshal as an object first
+		var sshObj sshAdminResponse
+		if err := json.Unmarshal(resp.SSH, &sshObj); err == nil {
+			a.SSHEnabled = (sshObj.Enable == "enabled")
 
-		if ssh.SSHdKeyOnly != "" {
-			a.SSHdKeyOnly = ssh.SSHdKeyOnly
-		} else {
-			a.SSHdKeyOnly = DefaultAdvancedAdminSSHdKeyOnly
-		}
-
-		a.SSHdAgentForwarding = (ssh.SSHdAgentForwarding == "enabled")
-
-		if ssh.Port != "" {
-			p, err := strconv.Atoi(ssh.Port)
-			if err != nil {
-				return a, fmt.Errorf("%w, unable to parse ssh port '%s'", ErrUnableToParse, ssh.Port)
+			if sshObj.SSHdKeyOnly != "" {
+				a.SSHdKeyOnly = sshObj.SSHdKeyOnly
+			} else {
+				a.SSHdKeyOnly = DefaultAdvancedAdminSSHdKeyOnly
 			}
 
-			a.SSHPort = p
+			a.SSHdAgentForwarding = (sshObj.SSHdAgentForwarding == "enabled")
+
+			if sshObj.Port != "" {
+				p, err := strconv.Atoi(sshObj.Port)
+				if err != nil {
+					return a, fmt.Errorf("%w, unable to parse ssh port '%s'", ErrUnableToParse, sshObj.Port)
+				}
+
+				a.SSHPort = p
+			}
+		} else {
+			// Fell through — SSH field is a string (e.g. "enabled" or "")
+			sshStr := strings.Trim(string(resp.SSH), `"`)
+			a.SSHEnabled = (sshStr == "enabled")
+			a.SSHdKeyOnly = DefaultAdvancedAdminSSHdKeyOnly
 		}
 	} else {
 		a.SSHdKeyOnly = DefaultAdvancedAdminSSHdKeyOnly
