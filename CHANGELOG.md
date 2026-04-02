@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.42.0...v0.43.0) (2026-04-02)
+
+
+### Features
+
+* add IPsec Phase 1 and Phase 2 resources and data sources ([4e87512](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/4e87512cfb54bc9baae47a28756b2e142d3cb312))
+
 ## [0.42.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.41.0...v0.42.0) (2026-04-02)
 
 
