@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.1](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.0...v0.43.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* handle SSH config as both object and string in system advanced admin response ([53b451a](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/53b451a7ae669ee624542b3fbc8c44ee4d176ec0))
+
 ## [0.43.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.42.0...v0.43.0) (2026-04-02)
 
 
