@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.3](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.2...v0.43.3) (2026-04-02)
+
+
+### Bug Fixes
+
+* escape user values in PHP commands to prevent parse errors ([5724393](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/57243937bcc56ae49ec5cfab80c67c848222a0f5))
+
 ## [0.43.2](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.1...v0.43.2) (2026-04-02)
 
 
