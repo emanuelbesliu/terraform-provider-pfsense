@@ -274,36 +274,64 @@ func (pf *Client) callHTML(ctx context.Context, method string, relativeURL url.U
 		return nil, err
 	}
 
+	// Update CSRF token from response if available. Each pfSense page
+	// response contains a fresh token, and subsequent requests must use it.
+	_ = pf.updateToken(doc)
+
 	return doc, nil
 }
 
 func (pf *Client) executePHPCommand(ctx context.Context, command string, value any) error {
+	const maxPHPRetries = 10
+	const phpRetryBaseWait = 3 * time.Second
+
 	relativeURL := url.URL{Path: "diag_command.php"}
 	values := url.Values{
 		"txtPHPCommand": {command},
 		"submit":        {"EXECPHP"},
 	}
-	doc, err := pf.callHTML(ctx, http.MethodPost, relativeURL, &values)
-	if err != nil {
-		return err
+
+	var lastErr error
+
+	for attempt := 1; attempt <= maxPHPRetries; attempt++ {
+		doc, err := pf.callHTML(ctx, http.MethodPost, relativeURL, &values)
+		if err != nil {
+			return err
+		}
+
+		resp := doc.FindMatcher(goquery.Single("pre"))
+		if resp.Length() != 1 {
+			lastErr = fmt.Errorf("%w, php command response not found", ErrUnableToScrapeHTML)
+
+			if attempt < maxPHPRetries {
+				wait := phpRetryBaseWait * time.Duration(attempt)
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(wait):
+				}
+
+				continue
+			}
+
+			return lastErr
+		}
+
+		commandErr := doc.FindMatcher(goquery.Single("#errdiv"))
+		if commandErr.Length() == 1 {
+			return fmt.Errorf("%w, php command failed, %s", ErrServerValidation, resp.Text())
+		}
+
+		err = json.Unmarshal([]byte(resp.Text()), &value)
+		if err != nil {
+			return fmt.Errorf("%w php command response as JSON, %w", ErrUnableToParse, err)
+		}
+
+		return nil
 	}
 
-	resp := doc.FindMatcher(goquery.Single("pre"))
-	if resp.Length() != 1 {
-		return fmt.Errorf("%w, php command response not found", ErrUnableToScrapeHTML)
-	}
-
-	commandErr := doc.FindMatcher(goquery.Single("#errdiv"))
-	if commandErr.Length() == 1 {
-		return fmt.Errorf("%w, php command failed, %s", ErrServerValidation, resp.Text())
-	}
-
-	err = json.Unmarshal([]byte(resp.Text()), &value)
-	if err != nil {
-		return fmt.Errorf("%w php command response as JSON, %w", ErrUnableToParse, err)
-	}
-
-	return nil
+	return lastErr
 }
 
 func removeEmptyStrings(s []string) []string {

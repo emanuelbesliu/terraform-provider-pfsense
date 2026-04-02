@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 // ============================================================================
@@ -212,6 +213,16 @@ func parseIPsecPhase2Response(resp ipsecPhase2Response) IPsecPhase2 {
 	return p2
 }
 
+// generatePHPUniqID generates a unique identifier matching PHP's uniqid()
+// format: 8 hex chars of seconds since epoch + 5 hex chars of microseconds.
+func generatePHPUniqID() string {
+	now := time.Now()
+	sec := now.Unix()
+	usec := now.UnixMicro() % 1_000_000
+
+	return fmt.Sprintf("%08x%05x", sec, usec)
+}
+
 // ============================================================================
 // Form values for POST
 // ============================================================================
@@ -233,9 +244,12 @@ func ipsecPhase2FormValues(p2 IPsecPhase2) url.Values {
 		"descr":    {p2.Description},
 	}
 
-	// Unique ID (for updates)
+	// Unique ID — required by pfSense for both create and update.
+	// For creates, generate a PHP-style uniqid (hex timestamp).
 	if p2.UniqID != "" {
 		values.Set("uniqid", p2.UniqID)
+	} else {
+		values.Set("uniqid", generatePHPUniqID())
 	}
 
 	// ReqID
@@ -264,7 +278,7 @@ func ipsecPhase2FormValues(p2 IPsecPhase2) url.Values {
 	if p2.PingHost != "" {
 		values.Set("pinghost", p2.PingHost)
 	}
-	if p2.Keepalive != "" {
+	if p2.Keepalive == "enabled" {
 		values.Set("keepalive", "yes")
 	}
 
@@ -375,6 +389,16 @@ func (pf *Client) CreateIPsecPhase2(ctx context.Context, p2Req IPsecPhase2) (*IP
 
 	if err := pf.createOrUpdateIPsecPhase2(ctx, p2Req, nil); err != nil {
 		return nil, fmt.Errorf("%w ipsec phase2, %w", ErrCreateOperationFailed, err)
+	}
+
+	// Wait for pfSense to finish processing the IPsec config change before
+	// attempting to read back via diag_command.php. The create POST triggers
+	// an internal config write that can temporarily make PHP command execution
+	// unavailable.
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(5 * time.Second):
 	}
 
 	phase2s, err := pf.getIPsecPhase2s(ctx)
