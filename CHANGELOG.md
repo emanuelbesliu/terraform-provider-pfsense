@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.44.0...v0.45.0) (2026-04-08)
+
+
+### Features
+
+* add pfsense_certificate_authority resource and data sources for native CA management ([ad20690](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/ad20690ad0462dc0a4f0271aae4f6f27a205bc0e))
+
 ## [0.44.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.3...v0.44.0) (2026-04-08)
 
 
