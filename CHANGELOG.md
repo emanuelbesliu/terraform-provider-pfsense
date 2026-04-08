@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.1](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.45.0...v0.45.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* harden PHP command execution with session recovery, login detection, and pkg database fallback ([01bdc44](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/01bdc44053e028973bcc4c87f9a25be21340cc44))
+
 ## [0.45.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.44.0...v0.45.0) (2026-04-08)
 
 
