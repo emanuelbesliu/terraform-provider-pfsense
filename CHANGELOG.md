@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.3...v0.44.0) (2026-04-08)
+
+
+### Features
+
+* add pfsense_package resource and data sources for native package management ([ee40956](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/ee40956f7ff8706ec27fd2cebb8634bb540fd4a1))
+
 ## [0.43.3](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.43.2...v0.43.3) (2026-04-02)
 
 
