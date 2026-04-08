@@ -263,24 +263,71 @@ func NewClient(ctx context.Context, opts *Options) (*Client, error) {
 }
 
 func (pf *Client) callHTML(ctx context.Context, method string, relativeURL url.URL, formValues *url.Values) (*goquery.Document, error) {
+	_, doc, err := pf.callHTMLRaw(ctx, method, relativeURL, formValues)
+
+	return doc, err
+}
+
+func (pf *Client) callHTMLRaw(ctx context.Context, method string, relativeURL url.URL, formValues *url.Values) ([]byte, *goquery.Document, error) {
 	resp, err := pf.call(ctx, method, relativeURL, formValues)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	defer resp.Body.Close() //nolint:errcheck
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	_, _ = io.Copy(io.Discard, resp.Body)
+	rawBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("unable to read response body, %w", err)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(rawBody)))
+	if err != nil {
+		return rawBody, nil, err
 	}
 
 	// Update CSRF token from response if available. Each pfSense page
 	// response contains a fresh token, and subsequent requests must use it.
 	_ = pf.updateToken(doc)
 
-	return doc, nil
+	return rawBody, doc, nil
+}
+
+func (pf *Client) reAuthenticate(ctx context.Context) error {
+	rootURL := url.URL{Path: "/"}
+
+	doc, err := pf.callHTML(ctx, http.MethodGet, rootURL, nil)
+	if err != nil {
+		return fmt.Errorf("%w, %w", ErrLoginFailed, err)
+	}
+
+	if err := pf.updateToken(doc); err != nil {
+		return fmt.Errorf("%w, %w", ErrLoginFailed, err)
+	}
+
+	values := url.Values{
+		"usernamefld": {pf.Options.Username},
+		"passwordfld": {pf.Options.Password},
+		"login":       {"Sign In"},
+	}
+
+	doc, err = pf.callHTML(ctx, http.MethodPost, rootURL, &values)
+	if err != nil {
+		return fmt.Errorf("%w, %w", ErrLoginFailed, err)
+	}
+
+	body := doc.FindMatcher(goquery.Single("body"))
+	if body.Length() == 1 && strings.Contains(body.Text(), "Username or Password incorrect") {
+		return fmt.Errorf("%w, username or password incorrect during re-authentication", ErrLoginFailed)
+	}
+
+	return pf.updateToken(doc)
+}
+
+func (pf *Client) isLoginPageRaw(body []byte) bool {
+	s := string(body)
+
+	return strings.Contains(s, `name="usernamefld"`) || strings.Contains(s, `name="passwordfld"`)
 }
 
 func (pf *Client) executePHPCommand(ctx context.Context, command string, value any) error {
@@ -296,9 +343,33 @@ func (pf *Client) executePHPCommand(ctx context.Context, command string, value a
 	var lastErr error
 
 	for attempt := 1; attempt <= maxPHPRetries; attempt++ {
-		doc, err := pf.callHTML(ctx, http.MethodPost, relativeURL, &values)
+		// GET the page first to obtain a page-specific CSRF token.
+		getRawBody, _, getErr := pf.callHTMLRaw(ctx, http.MethodGet, relativeURL, nil)
+		if getErr != nil {
+			return getErr
+		}
+
+		if pf.isLoginPageRaw(getRawBody) {
+			if err := pf.reAuthenticate(ctx); err != nil {
+				return fmt.Errorf("session expired and re-authentication failed, %w", err)
+			}
+
+			continue
+		}
+
+		rawBody, doc, err := pf.callHTMLRaw(ctx, http.MethodPost, relativeURL, &values)
 		if err != nil {
 			return err
+		}
+
+		if pf.isLoginPageRaw(rawBody) {
+			lastErr = fmt.Errorf("POST to diag_command.php returned login page on attempt %d", attempt)
+
+			if err := pf.reAuthenticate(ctx); err != nil {
+				return fmt.Errorf("session expired after POST and re-authentication failed, %w", err)
+			}
+
+			continue
 		}
 
 		resp := doc.FindMatcher(goquery.Single("pre"))
@@ -325,9 +396,20 @@ func (pf *Client) executePHPCommand(ctx context.Context, command string, value a
 			return fmt.Errorf("%w, php command failed, %s", ErrServerValidation, resp.Text())
 		}
 
-		err = json.Unmarshal([]byte(resp.Text()), &value)
+		preText := resp.Text()
+		if len(preText) > 0 && preText[0] == '<' {
+			return fmt.Errorf("%w php command response as JSON, response contains HTML instead of JSON, response preview: %.500s", ErrUnableToParse, preText)
+		}
+
+		err = json.Unmarshal([]byte(preText), &value)
 		if err != nil {
-			return fmt.Errorf("%w php command response as JSON, %w", ErrUnableToParse, err)
+			previewLen := 1000
+			text := preText
+			if len(text) > previewLen {
+				text = text[:previewLen]
+			}
+
+			return fmt.Errorf("%w php command response as JSON, %w, response preview: %s", ErrUnableToParse, err, text)
 		}
 
 		return nil

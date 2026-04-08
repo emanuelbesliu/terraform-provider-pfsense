@@ -51,6 +51,49 @@ func parsePackageResponse(resp packageResponse) Package {
 	}
 }
 
+func (pf *Client) getPackageFromPkgDB(ctx context.Context, name string) (*Package, error) {
+	command := fmt.Sprintf(
+		"$output = array();"+
+			"$lines = array();"+
+			"exec('/usr/local/sbin/pkg-static info -q \\'%s\\' 2>/dev/null', $lines, $rc);"+
+			"if ($rc !== 0) {"+
+			"$output['found'] = false;"+
+			"} else {"+
+			"$output['found'] = true;"+
+			"$vlines = array();"+
+			"exec('/usr/local/sbin/pkg-static query \\'%%v\\' \\'%s\\' 2>/dev/null', $vlines);"+
+			"$output['version'] = count($vlines) > 0 ? $vlines[0] : '';"+
+			"$dlines = array();"+
+			"exec('/usr/local/sbin/pkg-static query \\'%%c\\' \\'%s\\' 2>/dev/null', $dlines);"+
+			"$output['comment'] = count($dlines) > 0 ? $dlines[0] : '';"+
+			"}"+
+			"print(json_encode($output));",
+		phpEscape(name),
+		phpEscape(name),
+		phpEscape(name),
+	)
+
+	var result struct {
+		Found   bool   `json:"found"`
+		Version string `json:"version"`
+		Comment string `json:"comment"`
+	}
+
+	if err := pf.executePHPCommand(ctx, command, &result); err != nil {
+		return nil, fmt.Errorf("%w package from pkg database, %w", ErrGetOperationFailed, err)
+	}
+
+	if !result.Found {
+		return nil, fmt.Errorf("package %w with name '%s' in pkg database", ErrNotFound, name)
+	}
+
+	return &Package{
+		Name:             name,
+		InstalledVersion: result.Version,
+		Description:      result.Comment,
+	}, nil
+}
+
 func (pf *Client) getPackages(ctx context.Context) (*Packages, error) {
 	command := "require_once('pkg-utils.inc');" +
 		"$pkgs = get_pkg_info('all', false, true);" +
@@ -98,11 +141,16 @@ func (pf *Client) GetPackage(ctx context.Context, name string) (*Package, error)
 	}
 
 	pkg, err := pkgs.GetByName(name)
-	if err != nil {
+	if err == nil {
+		return pkg, nil
+	}
+
+	dbPkg, dbErr := pf.getPackageFromPkgDB(ctx, name)
+	if dbErr != nil {
 		return nil, fmt.Errorf("%w package, %w", ErrGetOperationFailed, err)
 	}
 
-	return pkg, nil
+	return dbPkg, nil
 }
 
 func (pf *Client) InstallPackage(ctx context.Context, name string) (*Package, error) {
@@ -154,6 +202,10 @@ func (pf *Client) InstallPackageFromURL(ctx context.Context, name string, packag
 		return nil, fmt.Errorf("%w package, package '%s' is already installed", ErrCreateOperationFailed, name)
 	}
 
+	if dbPkg, dbErr := pf.getPackageFromPkgDB(ctx, name); dbErr == nil {
+		return dbPkg, nil
+	}
+
 	if !strings.HasPrefix(packageURL, "https://") && !strings.HasPrefix(packageURL, "http://") {
 		return nil, fmt.Errorf("%w, package_url must start with http:// or https://", ErrClientValidation)
 	}
@@ -162,7 +214,6 @@ func (pf *Client) InstallPackageFromURL(ctx context.Context, name string, packag
 		"$output = array();"+
 			"$output['fetch'] = mwexec('/usr/local/sbin/pkg-static add -f \\'%s\\'');"+
 			"$output['post_install'] = '';"+
-			// run POST-INSTALL script if present
 			"$pkg_name = basename('%s');"+
 			"$pkg_name = preg_replace('/\\.pkg$/', '', $pkg_name);"+
 			"$post_install = '/usr/local/etc/rc.d/' . $pkg_name;"+
@@ -177,13 +228,15 @@ func (pf *Client) InstallPackageFromURL(ctx context.Context, name string, packag
 		return nil, fmt.Errorf("%w package '%s' from URL, %w", ErrCreateOperationFailed, name, err)
 	}
 
-	pkgs, err := pf.getPackages(ctx)
+	pkg, err := pf.getPackageFromPkgDB(ctx, name)
 	if err != nil {
-		return nil, fmt.Errorf("%w packages after installing from URL, %w", ErrGetOperationFailed, err)
-	}
+		pkgs, listErr := pf.getPackages(ctx)
+		if listErr == nil {
+			if p, findErr := pkgs.GetByName(name); findErr == nil {
+				return p, nil
+			}
+		}
 
-	pkg, err := pkgs.GetByName(name)
-	if err != nil {
 		return nil, fmt.Errorf("%w package after installing '%s' from URL, package not found in installed list — install may have failed, %w", ErrCreateOperationFailed, name, err)
 	}
 
@@ -198,20 +251,38 @@ func (pf *Client) DeletePackage(ctx context.Context, name string) error {
 		return fmt.Errorf("%w packages, %w", ErrGetOperationFailed, err)
 	}
 
-	if _, err := existingPkgs.GetByName(name); err != nil {
-		return fmt.Errorf("%w package, %w", ErrGetOperationFailed, err)
+	inRepo := false
+	if _, err := existingPkgs.GetByName(name); err == nil {
+		inRepo = true
+	} else {
+		if _, dbErr := pf.getPackageFromPkgDB(ctx, name); dbErr != nil {
+			return fmt.Errorf("%w package, %w", ErrGetOperationFailed, err)
+		}
 	}
 
-	command := fmt.Sprintf(
-		"require_once('pkg-utils.inc');"+
-			"pkg_delete('%s');"+
-			"print(json_encode(true));",
-		phpEscape(name),
-	)
+	if inRepo {
+		command := fmt.Sprintf(
+			"require_once('pkg-utils.inc');"+
+				"pkg_delete('%s');"+
+				"print(json_encode(true));",
+			phpEscape(name),
+		)
 
-	var result bool
-	if err := pf.executePHPCommand(ctx, command, &result); err != nil {
-		return fmt.Errorf("%w package '%s', %w", ErrDeleteOperationFailed, name, err)
+		var result bool
+		if err := pf.executePHPCommand(ctx, command, &result); err != nil {
+			return fmt.Errorf("%w package '%s', %w", ErrDeleteOperationFailed, name, err)
+		}
+	} else {
+		command := fmt.Sprintf(
+			"$rc = mwexec('/usr/local/sbin/pkg-static delete -y \\'%s\\'');"+
+				"print(json_encode(array('rc' => $rc)));",
+			phpEscape(name),
+		)
+
+		var result map[string]interface{}
+		if err := pf.executePHPCommand(ctx, command, &result); err != nil {
+			return fmt.Errorf("%w package '%s', %w", ErrDeleteOperationFailed, name, err)
+		}
 	}
 
 	pkgs, err := pf.getPackages(ctx)
@@ -221,6 +292,10 @@ func (pf *Client) DeletePackage(ctx context.Context, name string) error {
 
 	if _, err := pkgs.GetByName(name); err == nil {
 		return fmt.Errorf("%w package '%s', still installed after deletion", ErrDeleteOperationFailed, name)
+	}
+
+	if _, dbErr := pf.getPackageFromPkgDB(ctx, name); dbErr == nil {
+		return fmt.Errorf("%w package '%s', still found in pkg database after deletion", ErrDeleteOperationFailed, name)
 	}
 
 	return nil

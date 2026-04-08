@@ -2,6 +2,7 @@ package pfsense
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 )
@@ -131,8 +132,9 @@ func parseCertificateAuthorityResponse(resp certificateAuthorityResponse) Certif
 }
 
 func (pf *Client) getCertificateAuthorities(ctx context.Context) (*CertificateAuthorities, error) {
-	command := "require_once('guiconfig.inc');" +
+	command := "require_once('config.inc');" +
 		"require_once('certs.inc');" +
+		"$old_err = error_reporting(0);" +
 		"$cas = array();" +
 		"foreach (config_get_path('ca', array()) as $idx => $ca) {" +
 		"if (!is_array($ca) || empty($ca)) { continue; }" +
@@ -147,8 +149,8 @@ func (pf *Client) getCertificateAuthorities(ctx context.Context) (*CertificateAu
 		"$item['serial'] = (string)cert_get_serial($ca['crt'], true);" +
 		"$item['has_private_key'] = !empty($ca['prv']);" +
 		"$item['is_self_signed'] = ($subject === $issuer);" +
-		"$item['trust_enabled'] = ($ca['trust'] === 'enabled');" +
-		"$item['randomserial'] = ($ca['randomserial'] === 'enabled');" +
+		"$item['trust_enabled'] = (($ca['trust'] ?? '') === 'enabled');" +
+		"$item['randomserial'] = (($ca['randomserial'] ?? '') === 'enabled');" +
 		"$item['next_serial'] = (int)($ca['serial'] ?? 0);" +
 		"$item['valid_from'] = $crt_details['validFrom'] ?? '';" +
 		"$item['valid_to'] = $crt_details['validTo'] ?? '';" +
@@ -156,6 +158,7 @@ func (pf *Client) getCertificateAuthorities(ctx context.Context) (*CertificateAu
 		"$item['certificate'] = base64_decode($ca['crt']);" +
 		"array_push($cas, $item);" +
 		"};" +
+		"error_reporting($old_err);" +
 		"print(json_encode($cas));"
 
 	var caResp []certificateAuthorityResponse
@@ -222,13 +225,18 @@ func (pf *Client) ImportCertificateAuthority(ctx context.Context, req Certificat
 		trustValue = "enabled"
 	}
 
+	// Base64-encode the PEM cert and key in Go to avoid newline/special-char
+	// issues when embedding in PHP single-quoted strings.
+	certB64 := base64.StdEncoding.EncodeToString([]byte(req.Certificate))
+	keyB64 := base64.StdEncoding.EncodeToString([]byte(req.PrivateKey))
+
 	command := fmt.Sprintf(
-		"require_once('guiconfig.inc');"+
+		"require_once('config.inc');"+
 			"require_once('certs.inc');"+
 			"$result = array('success' => false, 'refid' => null, 'error' => null);"+
 			"$descr = '%s';"+
-			"$cert_pem = '%s';"+
-			"$key_pem = '%s';"+
+			"$cert_pem = base64_decode('%s');"+
+			"$key_pem = base64_decode('%s');"+
 			"$next_serial = %d;"+
 			"if (!strstr($cert_pem, 'BEGIN CERTIFICATE') || !strstr($cert_pem, 'END CERTIFICATE')) {"+
 			"$result['error'] = 'Certificate is not in PEM format';"+
@@ -271,8 +279,8 @@ func (pf *Client) ImportCertificateAuthority(ctx context.Context, req Certificat
 			"$result['refid'] = $ca['refid'];"+
 			"print(json_encode($result));",
 		phpEscape(req.Descr),
-		phpEscape(req.Certificate),
-		phpEscape(req.PrivateKey),
+		certB64,
+		keyB64,
 		req.NextSerial,
 		phpEscape(trustValue),
 	)
@@ -322,7 +330,7 @@ func (pf *Client) UpdateCertificateAuthority(ctx context.Context, refid string, 
 	}
 
 	command := fmt.Sprintf(
-		"require_once('guiconfig.inc');"+
+		"require_once('config.inc');"+
 			"require_once('certs.inc');"+
 			"$result = array('success' => false, 'error' => null);"+
 			"$refid = '%s';"+
@@ -378,7 +386,7 @@ func (pf *Client) DeleteCertificateAuthority(ctx context.Context, refid string) 
 	defer pf.write(&pf.mutexes.CertificateAuthority)()
 
 	command := fmt.Sprintf(
-		"require_once('guiconfig.inc');"+
+		"require_once('config.inc');"+
 			"require_once('certs.inc');"+
 			"$result = array('success' => false, 'error' => null);"+
 			"$refid = '%s';"+
