@@ -339,5 +339,6 @@ func (p *pfSenseProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewDHCPv4StaticMappingResource,
 		NewExecutePHPCommandResource,
 		NewRESTAPIKeyResource,
+		NewRESTAPISettingsResource,
 	}
 }
