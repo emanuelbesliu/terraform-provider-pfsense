@@ -91,6 +91,7 @@ type mutexes struct {
 	CertificateAuthority       sync.RWMutex
 	CronJob                    sync.RWMutex
 	Package                    sync.RWMutex
+	RESTAPIKey                 sync.RWMutex
 	VLAN                       sync.RWMutex
 }
 
