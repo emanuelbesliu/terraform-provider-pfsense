@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.46.0...v0.47.0) (2026-04-16)
+
+
+### Features
+
+* add pfsense_rest_api_settings resource for managing REST API auth methods ([#12](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/12)) ([e198695](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/e1986957461af1ebbb758a22e90cfe1f8ecf5961))
+
 ## [0.46.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.45.1...v0.46.0) (2026-04-16)
 
 
