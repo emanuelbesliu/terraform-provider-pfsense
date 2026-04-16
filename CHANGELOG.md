@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.45.1...v0.46.0) (2026-04-16)
+
+
+### Features
+
+* add pfsense_rest_api_key resource for REST API v2 key management ([13c5db1](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/13c5db16b772c680fdf245540b79cbdf6c71e1d5))
+
 ## [0.45.1](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.45.0...v0.45.1) (2026-04-08)
 
 
