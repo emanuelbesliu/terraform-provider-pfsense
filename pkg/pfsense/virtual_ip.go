@@ -26,33 +26,33 @@ var ValidVirtualIPModes = []string{
 }
 
 type virtualIPResponse struct {
-	Mode       string `json:"mode"`
-	Interface  string `json:"interface"`
-	VHID       string `json:"vhid"`
-	AdvSkew    string `json:"advskew"`
-	AdvBase    string `json:"advbase"`
-	Password   string `json:"password"`
-	Subnet     string `json:"subnet"`
-	SubnetBits string `json:"subnet_bits"`
+	Mode        string `json:"mode"`
+	Interface   string `json:"interface"`
+	VHID        string `json:"vhid"`
+	AdvSkew     string `json:"advskew"`
+	AdvBase     string `json:"advbase"`
+	Password    string `json:"password"`
+	Subnet      string `json:"subnet"`
+	SubnetBits  string `json:"subnet_bits"`
 	Description string `json:"descr"`
-	Type       string `json:"type"`
-	UniqueID   string `json:"uniqid"`
-	ControlID  int    `json:"controlID"` //nolint:tagliatelle
+	Type        string `json:"type"`
+	UniqueID    string `json:"uniqid"`
+	ControlID   int    `json:"controlID"` //nolint:tagliatelle
 }
 
 type VirtualIP struct {
-	Mode       string
-	Interface  string
-	VHID       *int
-	AdvSkew    *int
-	AdvBase    *int
-	Password   string
-	Subnet     string
-	SubnetBits int
+	Mode        string
+	Interface   string
+	VHID        *int
+	AdvSkew     *int
+	AdvBase     *int
+	Password    string
+	Subnet      string
+	SubnetBits  int
 	Description string
-	Type       string
-	UniqueID   string
-	controlID  int
+	Type        string
+	UniqueID    string
+	controlID   int
 }
 
 func (v *VirtualIP) SetMode(mode string) error {
