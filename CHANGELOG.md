@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.47.0...v0.48.0) (2026-04-28)
+
+
+### Features
+
+* add pfsense_firewall_virtual_ip resource and data sources ([#30](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/30)) ([bec8243](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/bec8243d52f171d9e8ce7456b885305b8e80d26d))
+
 ## [0.47.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.46.0...v0.47.0) (2026-04-16)
 
 
