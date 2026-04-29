@@ -93,6 +93,7 @@ type mutexes struct {
 	Package                    sync.RWMutex
 	RESTAPIKey                 sync.RWMutex
 	RESTAPISettings            sync.RWMutex
+	NATPortForward             sync.RWMutex
 	VirtualIP                  sync.RWMutex
 	VLAN                       sync.RWMutex
 }
