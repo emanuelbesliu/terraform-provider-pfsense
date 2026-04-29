@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.50.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.49.0...v0.50.0) (2026-04-29)
+
+
+### Features
+
+* add NAT port forward resource and data sources ([#35](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/35)) ([0babece](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/0babece6c226ba95d51b501605e686921f68d550))
+
 ## [0.49.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.48.0...v0.49.0) (2026-04-28)
 
 
