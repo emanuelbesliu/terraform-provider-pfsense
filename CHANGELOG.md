@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.51.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.50.0...v0.51.0) (2026-04-29)
+
+
+### Features
+
+* add certificate resource and data sources ([#19](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/19)) ([#37](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/37)) ([042b574](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/042b574204062616abca16a6e7ba1d32676e81a6))
+
 ## [0.50.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.49.0...v0.50.0) (2026-04-29)
 
 
