@@ -88,6 +88,7 @@ type mutexes struct {
 	Group                      sync.RWMutex
 	GroupApply                 sync.Mutex
 	AuthServer                 sync.RWMutex
+	Certificate                sync.RWMutex
 	CertificateAuthority       sync.RWMutex
 	CronJob                    sync.RWMutex
 	Package                    sync.RWMutex
