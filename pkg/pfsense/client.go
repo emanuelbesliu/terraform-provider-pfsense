@@ -99,6 +99,7 @@ type mutexes struct {
 	NATPortForward             sync.RWMutex
 	VirtualIP                  sync.RWMutex
 	VLAN                       sync.RWMutex
+	WakeOnLan                  sync.RWMutex
 }
 
 type Client struct {
@@ -357,6 +358,8 @@ func (pf *Client) executePHPCommand(ctx context.Context, command string, value a
 		}
 
 		if pf.isLoginPageRaw(getRawBody) {
+			lastErr = fmt.Errorf("GET diag_command.php returned login page on attempt %d", attempt)
+
 			if err := pf.reAuthenticate(ctx); err != nil {
 				return fmt.Errorf("session expired and re-authentication failed, %w", err)
 			}

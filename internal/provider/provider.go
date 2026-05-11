@@ -310,6 +310,8 @@ func (p *pfSenseProvider) DataSources(_ context.Context) []func() datasource.Dat
 		NewUsersDataSource,
 		NewVLANDataSource,
 		NewVLANsDataSource,
+		NewWakeOnLanDataSource,
+		NewWakeOnLanEntriesDataSource,
 	}
 }
 
@@ -355,5 +357,6 @@ func (p *pfSenseProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewExecutePHPCommandResource,
 		NewRESTAPIKeyResource,
 		NewRESTAPISettingsResource,
+		NewWakeOnLanResource,
 	}
 }

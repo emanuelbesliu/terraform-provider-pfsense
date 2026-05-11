@@ -1,0 +1,3 @@
+data "pfsense_wake_on_lan" "server" {
+  mac = "00:11:22:33:44:55"
+}
