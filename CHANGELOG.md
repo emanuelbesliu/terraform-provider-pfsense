@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.53.1](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.53.0...v0.53.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* allow underscore in interface name validation ([#70](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/70)) ([f6bca5d](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/f6bca5d9e262fa59098b8560e1a498e9e85a6642)), closes [#53](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/53)
+
 ## [0.53.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.52.0...v0.53.0) (2026-05-11)
 
 
