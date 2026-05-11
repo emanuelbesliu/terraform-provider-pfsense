@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.54.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.53.1...v0.54.0) (2026-05-11)
+
+
+### Features
+
+* add Wake-on-LAN resource and data sources ([#47](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/47)) ([#72](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/72)) ([3889ddc](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/3889ddc66dc4c5cfd6c43f86468de98fd4061925))
+
 ## [0.53.1](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.53.0...v0.53.1) (2026-05-11)
 
 
