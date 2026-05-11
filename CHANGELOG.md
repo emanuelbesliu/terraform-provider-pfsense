@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.53.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.52.0...v0.53.0) (2026-05-11)
+
+
+### Features
+
+* add 1:1 NAT (BINAT) resource and data source ([#67](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/67)) ([88004d4](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/88004d423c785a6c62fe45f0d9e68190b9eb4b30))
+* replace NAT 1:1 implementation with consistent naming ([#16](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/16)) ([#69](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/69)) ([2056746](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/20567462b366fc9a9b9612f06a137e6b629cefc6))
+
 ## [0.52.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.51.0...v0.52.0) (2026-05-11)
 
 
