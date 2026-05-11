@@ -99,8 +99,8 @@ func ValidateInterface(iface string) error {
 	}
 
 	for _, character := range iface {
-		if !unicode.IsLetter(character) && !unicode.IsDigit(character) {
-			return fmt.Errorf("%w, interface can only contain letters and numbers (A-Z, a-z, 0-9)", ErrClientValidation)
+		if !unicode.IsLetter(character) && !unicode.IsDigit(character) && character != '_' {
+			return fmt.Errorf("%w, interface can only contain letters, numbers, and underscores (A-Z, a-z, 0-9, _)", ErrClientValidation)
 		}
 	}
 
