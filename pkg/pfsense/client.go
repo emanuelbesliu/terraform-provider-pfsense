@@ -99,6 +99,7 @@ type mutexes struct {
 	NATPortForward             sync.RWMutex
 	VirtualIP                  sync.RWMutex
 	VLAN                       sync.RWMutex
+	DynamicDNS                 sync.RWMutex
 }
 
 type Client struct {
