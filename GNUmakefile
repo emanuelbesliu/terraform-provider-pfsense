@@ -80,5 +80,12 @@ test/docs:
 test/pkg:
 	go test ./pkg/... -v -coverprofile=cover.out $(TESTARGS) -timeout 60m
 
+# Acceptance tests run against a REAL pfSense instance and create/destroy live
+# config. Set TF_PFSENSE_URL, TF_PFSENSE_USERNAME and TF_PFSENSE_PASSWORD first.
+# Run a subset with TESTARGS, e.g.:
+#   make test/acc TESTARGS='-run TestAccFirewallNATNPt'
 test/acc:
+ifndef TF_PFSENSE_PASSWORD
+	$(error TF_PFSENSE_PASSWORD must be set. Acceptance tests run against a real pfSense instance — also set TF_PFSENSE_URL and TF_PFSENSE_USERNAME (see README "Running Acceptance Tests"))
+endif
 	TF_ACC=1 TFENV_TERRAFORM_VERSION=$(TERRAFORM_VERSION) go test ./internal/provider/... -v -coverprofile=cover.out $(TESTARGS) -timeout 60m

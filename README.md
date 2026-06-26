@@ -257,9 +257,36 @@ go vet ./...
 # Generate documentation
 make docs
 
-# Run acceptance tests (requires a pfSense instance)
-make test/acc
+# Unit tests (no pfSense instance required)
+make test/pkg
 ```
+
+### Running Acceptance Tests
+
+Acceptance tests exercise the provider against a **real pfSense instance** by
+creating, importing, updating and destroying live configuration. Only run them
+against a non-production/lab firewall.
+
+Each resource's acceptance tests live in `internal/provider/*_test.go` and use a
+`CheckDestroy` to confirm resources are removed from pfSense afterwards.
+
+Set the connection environment variables, then run `make test/acc`:
+
+```shell
+export TF_PFSENSE_URL="https://192.168.1.1"   # your lab pfSense
+export TF_PFSENSE_USERNAME="admin"
+export TF_PFSENSE_PASSWORD="..."
+
+# Run the full acceptance suite
+make test/acc
+
+# Run a single resource's tests
+make test/acc TESTARGS='-run TestAccFirewallNATNPt'
+```
+
+> The `test/acc` target sets `TF_ACC=1` for you and fails fast if
+> `TF_PFSENSE_PASSWORD` is not set. Without `TF_ACC`, acceptance tests are
+> skipped, so `go test ./...` remains safe to run anywhere (this is what CI does).
 
 ## License
 
