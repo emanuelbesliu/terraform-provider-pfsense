@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.55.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.54.0...v0.55.0) (2026-06-26)
+
+
+### Features
+
+* add dynamic DNS resource and data sources ([#40](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/40)) ([#74](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/74)) ([56f3da6](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/56f3da643a7f437f90a8ee954a20862948081a33))
+* add firewall NAT NPt resource and data sources ([#76](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/76)) ([e29e0ab](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/e29e0ab142364e230ed0f3de96534096b330593a))
+
 ## [0.54.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.53.1...v0.54.0) (2026-05-11)
 
 
