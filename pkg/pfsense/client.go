@@ -100,6 +100,7 @@ type mutexes struct {
 	VirtualIP                  sync.RWMutex
 	VLAN                       sync.RWMutex
 	WakeOnLan                  sync.RWMutex
+	DynamicDNS                 sync.RWMutex
 }
 
 type Client struct {
