@@ -64,6 +64,7 @@ type mutexes struct {
 	GatewayGroupApply          sync.Mutex
 	Interface                  sync.RWMutex
 	InterfaceApply             sync.Mutex
+	InterfaceBridge            sync.RWMutex
 	InterfaceGroup             sync.RWMutex
 	IPsecPhase1                sync.RWMutex
 	IPsecPhase2                sync.RWMutex
