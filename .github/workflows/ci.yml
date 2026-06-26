@@ -88,7 +88,7 @@ jobs:
           go-version-file: ".go-version"
 
       - name: Run unit tests
-        run: go test -v -count=1 -coverprofile=coverage.out ./pkg/...
+        run: go test -v -count=1 -coverprofile=coverage.out ./...
 
       - name: Display coverage
         run: go tool cover -func=coverage.out

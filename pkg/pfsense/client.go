@@ -95,6 +95,7 @@ type mutexes struct {
 	RESTAPIKey                 sync.RWMutex
 	RESTAPISettings            sync.RWMutex
 	NATOneToOne                sync.RWMutex
+	NATNPt                     sync.RWMutex
 	NATOutbound                sync.RWMutex
 	NATPortForward             sync.RWMutex
 	VirtualIP                  sync.RWMutex
