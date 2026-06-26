@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.56.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.55.0...v0.56.0) (2026-06-26)
+
+
+### Features
+
+* add firewall schedule resource and data sources ([#78](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/78)) ([a52ef59](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/a52ef59dd0efc04cd0683ed16c5fdd91ff7f0031))
+
 ## [0.55.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.54.0...v0.55.0) (2026-06-26)
 
 
