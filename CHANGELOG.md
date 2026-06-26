@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.57.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.56.0...v0.57.0) (2026-06-26)
+
+
+### Features
+
+* add interface bridge resource and data sources ([#80](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/80)) ([f26a2a8](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/f26a2a86f6652835fdd67f572c7350456d1a1208))
+
 ## [0.56.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.55.0...v0.56.0) (2026-06-26)
 
 
