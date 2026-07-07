@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.58.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.57.0...v0.58.0) (2026-07-07)
+
+
+### Features
+
+* add OpenVPN server resource and data sources ([#49](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/49)) ([#82](https://github.com/emanuelbesliu/terraform-provider-pfsense/issues/82)) ([7588512](https://github.com/emanuelbesliu/terraform-provider-pfsense/commit/758851289ed206856f227c37c095246b64960836))
+
 ## [0.57.0](https://github.com/emanuelbesliu/terraform-provider-pfsense/compare/v0.56.0...v0.57.0) (2026-06-26)
 
 
