@@ -69,6 +69,7 @@ type mutexes struct {
 	IPsecPhase1                sync.RWMutex
 	IPsecPhase2                sync.RWMutex
 	IPsecApply                 sync.Mutex
+	OpenVPNServer              sync.RWMutex
 	Route                      sync.RWMutex
 	RouteApply                 sync.Mutex
 	SystemGeneral              sync.RWMutex
