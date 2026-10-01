@@ -143,7 +143,7 @@ func parseDynamicDNSResponse(resp dynamicDNSResponse) DynamicDNS {
 		RequestIf:         resp.RequestIf,
 		CurlProxy:         resp.CurlProxy,
 		Description:       resp.Description,
-		Disabled:          resp.Enable != "",
+		Disabled:          resp.Enable == "",
 		controlID:         resp.ControlID,
 	}
 }
@@ -342,7 +342,7 @@ func buildDynamicDNSItem(req DynamicDNS) string {
 		fmt.Sprintf("$item['requestif'] = '%s';", phpEscape(req.RequestIf)) +
 		fmt.Sprintf("$item['curl_proxy'] = '%s';", phpEscape(req.CurlProxy)) +
 		fmt.Sprintf("$item['descr'] = '%s';", phpEscape(req.Description)) +
-		boolToPHPField("$item", "enable", req.Disabled)
+		boolToPHPField("$item", "enable", !req.Disabled)
 }
 
 func boolToPHPField(varName, field string, value bool) string {
