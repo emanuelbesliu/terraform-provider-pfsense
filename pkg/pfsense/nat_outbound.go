@@ -7,24 +7,24 @@ import (
 )
 
 type natOutboundRuleResponse struct {
-	Interface      string `json:"interface"`
-	Protocol       string `json:"protocol"`
-	Source         any    `json:"source"`
-	SourcePort     string `json:"sourceport"`
-	Destination    any    `json:"destination"`
-	DstPort        string `json:"dstport"`
-	Target         string `json:"target"`
-	TargetIP       string `json:"targetip"`
-	TargetIPSubnet string `json:"targetip_subnet"` //nolint:tagliatelle
-	NATPort        string `json:"natport"`
-	PoolOpts       string `json:"poolopts"`
-	SourceHashKey  string `json:"source_hash_key"` //nolint:tagliatelle
-	StaticNATPort  string `json:"staticnatport"`
-	NoSync         string `json:"nosync"`
-	NoNAT          string `json:"nonat"`
-	Disabled       string `json:"disabled"`
-	Description    string `json:"descr"`
-	ControlID      int    `json:"controlID"` //nolint:tagliatelle
+	Interface      string  `json:"interface"`
+	Protocol       string  `json:"protocol"`
+	Source         any     `json:"source"`
+	SourcePort     string  `json:"sourceport"`
+	Destination    any     `json:"destination"`
+	DstPort        string  `json:"dstport"`
+	Target         string  `json:"target"`
+	TargetIP       string  `json:"targetip"`
+	TargetIPSubnet string  `json:"targetip_subnet"` //nolint:tagliatelle
+	NATPort        string  `json:"natport"`
+	PoolOpts       string  `json:"poolopts"`
+	SourceHashKey  string  `json:"source_hash_key"` //nolint:tagliatelle
+	StaticNATPort  *string `json:"staticnatport"`
+	NoSync         *string `json:"nosync"`
+	NoNAT          *string `json:"nonat"`
+	Disabled       *string `json:"disabled"`
+	Description    string  `json:"descr"`
+	ControlID      int     `json:"controlID"` //nolint:tagliatelle
 }
 
 type NATOutboundRule struct {
@@ -259,10 +259,10 @@ func parseNATOutboundRuleResponse(resp natOutboundRuleResponse) (NATOutboundRule
 	r.NATPort = resp.NATPort
 	r.PoolOpts = resp.PoolOpts
 	r.SourceHashKey = resp.SourceHashKey
-	r.StaticNATPort = resp.StaticNATPort != ""
-	r.NoSync = resp.NoSync != ""
-	r.NoNAT = resp.NoNAT != ""
-	r.Disabled = resp.Disabled != ""
+	r.StaticNATPort = resp.StaticNATPort != nil
+	r.NoSync = resp.NoSync != nil
+	r.NoNAT = resp.NoNAT != nil
+	r.Disabled = resp.Disabled != nil
 	r.Description = resp.Description
 	r.controlID = resp.ControlID
 

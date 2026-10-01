@@ -236,3 +236,67 @@ func TestNATOutboundRule_SetBooleans(t *testing.T) {
 		})
 	}
 }
+
+func TestParseNATOutboundRuleResponse_Booleans(t *testing.T) {
+	empty := ""
+
+	tests := []struct {
+		name string
+		resp natOutboundRuleResponse
+		want bool
+	}{
+		{
+			name: "absent",
+			resp: natOutboundRuleResponse{
+				Interface:   "wan",
+				Protocol:    "",
+				Source:      map[string]any{"any": ""},
+				Destination: map[string]any{"any": ""},
+				Description: "test",
+			},
+			want: false,
+		},
+		{
+			name: "present",
+			resp: natOutboundRuleResponse{
+				Interface:     "wan",
+				Protocol:      "",
+				Source:        map[string]any{"any": ""},
+				Destination:   map[string]any{"any": ""},
+				StaticNATPort: &empty,
+				NoSync:        &empty,
+				NoNAT:         &empty,
+				Disabled:      &empty,
+				Description:   "test",
+			},
+			want: true,
+		},
+	}
+
+	boolGetters := []struct {
+		name   string
+		getter func(*NATOutboundRule) bool
+	}{
+		{"StaticNATPort", func(r *NATOutboundRule) bool { return r.StaticNATPort }},
+		{"NoSync", func(r *NATOutboundRule) bool { return r.NoSync }},
+		{"NoNAT", func(r *NATOutboundRule) bool { return r.NoNAT }},
+		{"Disabled", func(r *NATOutboundRule) bool { return r.Disabled }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := parseNATOutboundRuleResponse(tt.resp)
+			if err != nil {
+				t.Errorf("parseNATOutboundRuleResponse() unexpected error: %v", err)
+
+				return
+			}
+
+			for _, bg := range boolGetters {
+				if bg.getter(&r) != tt.want {
+					t.Errorf("%s got %v, want %v", bg.name, bg.getter(&r), tt.want)
+				}
+			}
+		})
+	}
+}
