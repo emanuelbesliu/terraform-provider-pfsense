@@ -90,17 +90,21 @@ func ValidateConfigFileName(configFileName string) error {
 }
 
 func ValidateInterface(iface string) error {
-	if len(iface) == 0 {
-		return fmt.Errorf("%w, interface cannot be empty", ErrClientValidation)
-	}
+	// Floating rules carry a comma-separated list of interfaces; validate
+	// every element individually so floating rules can pass the same check.
+	for _, part := range strings.Split(iface, ",") {
+		if len(part) == 0 {
+			return fmt.Errorf("%w, interface cannot be empty", ErrClientValidation)
+		}
 
-	if !unicode.IsLetter(rune(iface[0])) {
-		return fmt.Errorf("%w, interface must start with a letter (A-Z, a-z)", ErrClientValidation)
-	}
+		if !unicode.IsLetter(rune(part[0])) {
+			return fmt.Errorf("%w, interface must start with a letter (A-Z, a-z)", ErrClientValidation)
+		}
 
-	for _, character := range iface {
-		if !unicode.IsLetter(character) && !unicode.IsDigit(character) && character != '_' {
-			return fmt.Errorf("%w, interface can only contain letters, numbers, and underscores (A-Z, a-z, 0-9, _)", ErrClientValidation)
+		for _, character := range part {
+			if !unicode.IsLetter(character) && !unicode.IsDigit(character) && character != '_' {
+				return fmt.Errorf("%w, interface can only contain letters, numbers, and underscores (A-Z, a-z, 0-9, _)", ErrClientValidation)
+			}
 		}
 	}
 

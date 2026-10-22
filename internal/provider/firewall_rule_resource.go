@@ -136,6 +136,24 @@ func (r *FirewallRuleResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Default:     booldefault.StaticBool(false),
 			},
+			"floating": schema.BoolAttribute{
+				Description: FirewallRuleModel{}.descriptions()["floating"].Description,
+				Computed:    true,
+				Optional:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"direction": schema.StringAttribute{
+				Description: FirewallRuleModel{}.descriptions()["direction"].Description,
+				Computed:    true,
+				Optional:    true,
+				Default:     stringdefault.StaticString("any"),
+			},
+			"quick": schema.BoolAttribute{
+				Description: FirewallRuleModel{}.descriptions()["quick"].Description,
+				Computed:    true,
+				Optional:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 			"apply": schema.BoolAttribute{
 				Description:         applyDescription,
 				MarkdownDescription: applyMarkdownDescription,
@@ -272,7 +290,15 @@ func (r *FirewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.DeleteFirewallRule(ctx, data.Tracker.ValueString(), data.Interface.ValueString())
+	// Floating rules must be deleted through the GUI "FloatingRules" tab;
+	// their stored interface (e.g. "wan,lan") is not a tab name, and the
+	// pfSense delete handler skips rules whose interface mismatches the tab.
+	deleteIface := data.Interface.ValueString()
+	if data.Floating.ValueBool() {
+		deleteIface = "FloatingRules"
+	}
+
+	err := r.client.DeleteFirewallRule(ctx, data.Tracker.ValueString(), deleteIface)
 	if addError(&resp.Diagnostics, "Error deleting firewall rule", err) {
 		return
 	}

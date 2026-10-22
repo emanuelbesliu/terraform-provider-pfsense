@@ -24,6 +24,9 @@ type firewallRuleResponse struct {
 	Description      string  `json:"descr"`
 	Disabled         *string `json:"disabled"`
 	Log              *string `json:"log"`
+	Floating         *string `json:"floating"`
+	Direction        string  `json:"direction"`
+	Quick            *string `json:"quick"`
 	Tracker          string  `json:"tracker"`
 	ControlID        int     `json:"controlID"`          //nolint:tagliatelle
 	AssociatedRuleID string  `json:"associated-rule-id"` //nolint:tagliatelle
@@ -43,6 +46,9 @@ type FirewallRule struct {
 	Description   string
 	Disabled      bool
 	Log           bool
+	Floating      bool
+	Direction     string
+	Quick         bool
 	Tracker       string
 	controlID     int
 }
@@ -79,14 +85,27 @@ func (r *FirewallRule) SetType(t string) error {
 }
 
 func (r *FirewallRule) SetInterface(iface string) error {
-	if err := ValidateInterface(iface); err != nil {
-		return fmt.Errorf("%w, invalid interface: %w", ErrClientValidation, err)
+	for _, part := range strings.Split(iface, ",") {
+		if err := ValidateInterface(part); err != nil {
+			return fmt.Errorf("%w, invalid interface: %w", ErrClientValidation, err)
+		}
 	}
 
 	r.Interface = iface
 
 	return nil
 }
+
+// SetFloating marks the rule as a floating rule. On the webConfigurator
+// floating rules are submitted via the interface[] multi-select with a
+// floating=yes flag; the stored interface value is the comma-separated list.
+func (r *FirewallRule) SetFloating(f bool) { r.Floating = f }
+
+// SetDirection sets the floating rule direction ("any", "in", "out").
+func (r *FirewallRule) SetDirection(d string) { r.Direction = d }
+
+// SetQuick sets the quick-match flag for floating rules.
+func (r *FirewallRule) SetQuick(q bool) { r.Quick = q }
 
 func (r *FirewallRule) SetIPProtocol(ipprotocol string) error {
 	valid := false
@@ -285,6 +304,13 @@ func parseFirewallRuleResponse(resp firewallRuleResponse) (FirewallRule, error) 
 	r.Log = resp.Log != nil
 	r.Tracker = resp.Tracker
 	r.controlID = resp.ControlID
+	r.Floating = resp.Floating != nil && *resp.Floating != ""
+	r.Quick = resp.Quick != nil && *resp.Quick != ""
+	if resp.Direction != "" {
+		r.Direction = resp.Direction
+	} else {
+		r.Direction = "any"
+	}
 
 	return r, nil
 }
@@ -355,6 +381,24 @@ func firewallRuleFormValues(ruleReq FirewallRule) url.Values {
 		"ipprotocol": {ruleReq.IPProtocol},
 		"descr":      {ruleReq.Description},
 		"save":       {"Save"},
+	}
+
+	if ruleReq.Floating {
+		// The floating form submits the interfaces as an array (interface[])
+		// and stores them as a comma-separated string.
+		values.Del("interface")
+		for _, iface := range strings.Split(ruleReq.Interface, ",") {
+			values.Add("interface[]", iface)
+		}
+		values.Set("floating", "yes")
+		if ruleReq.Direction != "" {
+			values.Set("direction", ruleReq.Direction)
+		} else {
+			values.Set("direction", "any")
+		}
+		if ruleReq.Quick {
+			values.Set("quick", "yes")
+		}
 	}
 
 	// Protocol: pfSense uses "proto" for the form field
