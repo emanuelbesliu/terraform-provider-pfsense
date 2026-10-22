@@ -545,37 +545,53 @@ func (pf *Client) UpdateFirewallRule(ctx context.Context, ruleReq FirewallRule) 
 	return r, nil
 }
 
-func (pf *Client) DeleteFirewallRule(ctx context.Context, tracker string) error {
+func (pf *Client) DeleteFirewallRule(ctx context.Context, tracker string, iface string) error {
 	defer pf.write(&pf.mutexes.FirewallRule)()
 
-	rules, err := pf.getFirewallRules(ctx)
-	if err != nil {
-		return fmt.Errorf("%w firewall rules, %w", ErrGetOperationFailed, err)
+	// ROOT-CAUSE FIX: pfSense >= 2.7 expects the id that refers to the
+	// position inside get_filter_rules_list() (global merged list), NOT the
+	// raw $config['filter']['rule'] array key the original code used.
+	// Resolve the real GUI id via exec_php (same mechanism the client uses
+	// for reads), then delete via the stock GUI handler (which persists via
+	// write_config and marks the filter subsystem dirty), then verify.
+	type posResp struct {
+		Pos int `json:"pos"`
 	}
+	command := "$i=-1;foreach (get_filter_rules_list() as $r) {$i++;if (is_array($r) && isset($r['tracker']) && (string)$r['tracker'] === 'TRACKER') {print(json_encode(array(\"pos\" => $i)));return;}}print(json_encode(array(\"pos\" => -1)));"
+	command = strings.ReplaceAll(command, "TRACKER", tracker)
 
-	controlID, err := rules.GetControlIDByTracker(tracker)
-	if err != nil {
-		return fmt.Errorf("%w firewall rule, %w", ErrGetOperationFailed, err)
+	var pr posResp
+	if err := pf.executePHPCommand(ctx, command, &pr); err != nil {
+		return fmt.Errorf("%w firewall rule position, %w", ErrGetOperationFailed, err)
+	}
+	if pr.Pos < 0 {
+		return fmt.Errorf("%w firewall rule with tracker %s in rules list", ErrNotFound, tracker)
 	}
 
 	relativeURL := url.URL{Path: "firewall_rules.php"}
 	values := url.Values{
 		"act": {"del"},
-		"id":  {strconv.Itoa(*controlID)},
+		"id":  {strconv.Itoa(pr.Pos)},
+	}
+	if iface != "" {
+		values.Set("if", iface)
+	}
+	if pf.tokenKey != "" && pf.token != "" {
+		values.Set(pf.tokenKey, pf.token)
 	}
 
-	_, err = pf.callHTML(ctx, http.MethodPost, relativeURL, &values)
+	_, _, err := pf.callHTMLRaw(ctx, http.MethodPost, relativeURL, &values)
 	if err != nil {
 		return fmt.Errorf("%w firewall rule, %w", ErrDeleteOperationFailed, err)
 	}
 
-	rules, err = pf.getFirewallRules(ctx)
+	rules, err := pf.getFirewallRules(ctx)
 	if err != nil {
 		return fmt.Errorf("%w firewall rules after deleting, %w", ErrGetOperationFailed, err)
 	}
 
 	if _, err := rules.GetByTracker(tracker); err == nil {
-		return fmt.Errorf("%w firewall rule, still exists", ErrDeleteOperationFailed)
+		return fmt.Errorf("%w firewall rule, still exists after GUI delete of position %d", ErrDeleteOperationFailed, pr.Pos)
 	}
 
 	return nil
