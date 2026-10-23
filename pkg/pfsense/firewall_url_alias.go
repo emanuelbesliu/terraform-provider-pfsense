@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 type firewallURLAliasResponse struct {
@@ -354,7 +355,16 @@ func (pf *Client) DeleteFirewallURLAlias(ctx context.Context, name string) error
 	}
 
 	if _, err := urlAliases.GetByName(name); err == nil {
-		return fmt.Errorf("%w url alias, still exists", ErrDeleteOperationFailed)
+		// pfSense write_config can race the verifying read (plain overwrite
+		// of /conf/config.xml by the GUI request that just deleted the entry);
+		// re-verify once after a short pause beforereporting a phantom failure.
+		time.Sleep(1500 * time.Millisecond)
+		if urlAliases, err = pf.getFirewallURLAliases(ctx); err != nil {
+			return fmt.Errorf("%w url alias aliases after retrying read, %w", ErrGetOperationFailed, err)
+		}
+		if _, err := urlAliases.GetByName(name); err == nil {
+			return fmt.Errorf("%w url alias, still exists", ErrDeleteOperationFailed)
+		}
 	}
 
 	return nil

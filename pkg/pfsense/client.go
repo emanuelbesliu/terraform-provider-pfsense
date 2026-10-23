@@ -408,7 +408,7 @@ func (pf *Client) executePHPCommand(ctx context.Context, command string, value a
 
 		commandErr := doc.FindMatcher(goquery.Single("#errdiv"))
 		if commandErr.Length() == 1 {
-			return fmt.Errorf("%w, php command failed, %s", ErrServerValidation, resp.Text())
+			return fmt.Errorf("%w, php command failed, pre=%q errdiv=%q", ErrServerValidation, resp.Text(), commandErr.Text())
 		}
 
 		preText := resp.Text()

@@ -24,6 +24,9 @@ type firewallRuleResponse struct {
 	Description      string  `json:"descr"`
 	Disabled         *string `json:"disabled"`
 	Log              *string `json:"log"`
+	Floating         *string `json:"floating"`
+	Direction        string  `json:"direction"`
+	Quick            *string `json:"quick"`
 	Tracker          string  `json:"tracker"`
 	ControlID        int     `json:"controlID"`          //nolint:tagliatelle
 	AssociatedRuleID string  `json:"associated-rule-id"` //nolint:tagliatelle
@@ -43,6 +46,9 @@ type FirewallRule struct {
 	Description   string
 	Disabled      bool
 	Log           bool
+	Floating      bool
+	Direction     string
+	Quick         bool
 	Tracker       string
 	controlID     int
 }
@@ -79,14 +85,27 @@ func (r *FirewallRule) SetType(t string) error {
 }
 
 func (r *FirewallRule) SetInterface(iface string) error {
-	if err := ValidateInterface(iface); err != nil {
-		return fmt.Errorf("%w, invalid interface: %w", ErrClientValidation, err)
+	for _, part := range strings.Split(iface, ",") {
+		if err := ValidateInterface(part); err != nil {
+			return fmt.Errorf("%w, invalid interface: %w", ErrClientValidation, err)
+		}
 	}
 
 	r.Interface = iface
 
 	return nil
 }
+
+// SetFloating marks the rule as a floating rule. On the webConfigurator
+// floating rules are submitted via the interface[] multi-select with a
+// floating=yes flag; the stored interface value is the comma-separated list.
+func (r *FirewallRule) SetFloating(f bool) { r.Floating = f }
+
+// SetDirection sets the floating rule direction ("any", "in", "out").
+func (r *FirewallRule) SetDirection(d string) { r.Direction = d }
+
+// SetQuick sets the quick-match flag for floating rules.
+func (r *FirewallRule) SetQuick(q bool) { r.Quick = q }
 
 func (r *FirewallRule) SetIPProtocol(ipprotocol string) error {
 	valid := false
@@ -285,6 +304,13 @@ func parseFirewallRuleResponse(resp firewallRuleResponse) (FirewallRule, error) 
 	r.Log = resp.Log != nil
 	r.Tracker = resp.Tracker
 	r.controlID = resp.ControlID
+	r.Floating = resp.Floating != nil && *resp.Floating != ""
+	r.Quick = resp.Quick != nil && *resp.Quick != ""
+	if resp.Direction != "" {
+		r.Direction = resp.Direction
+	} else {
+		r.Direction = "any"
+	}
 
 	return r, nil
 }
@@ -355,6 +381,24 @@ func firewallRuleFormValues(ruleReq FirewallRule) url.Values {
 		"ipprotocol": {ruleReq.IPProtocol},
 		"descr":      {ruleReq.Description},
 		"save":       {"Save"},
+	}
+
+	if ruleReq.Floating {
+		// The floating form submits the interfaces as an array (interface[])
+		// and stores them as a comma-separated string.
+		values.Del("interface")
+		for _, iface := range strings.Split(ruleReq.Interface, ",") {
+			values.Add("interface[]", iface)
+		}
+		values.Set("floating", "yes")
+		if ruleReq.Direction != "" {
+			values.Set("direction", ruleReq.Direction)
+		} else {
+			values.Set("direction", "any")
+		}
+		if ruleReq.Quick {
+			values.Set("quick", "yes")
+		}
 	}
 
 	// Protocol: pfSense uses "proto" for the form field
@@ -545,37 +589,53 @@ func (pf *Client) UpdateFirewallRule(ctx context.Context, ruleReq FirewallRule) 
 	return r, nil
 }
 
-func (pf *Client) DeleteFirewallRule(ctx context.Context, tracker string) error {
+func (pf *Client) DeleteFirewallRule(ctx context.Context, tracker string, iface string) error {
 	defer pf.write(&pf.mutexes.FirewallRule)()
 
-	rules, err := pf.getFirewallRules(ctx)
-	if err != nil {
-		return fmt.Errorf("%w firewall rules, %w", ErrGetOperationFailed, err)
+	// ROOT-CAUSE FIX: pfSense >= 2.7 expects the id that refers to the
+	// position inside get_filter_rules_list() (global merged list), NOT the
+	// raw $config['filter']['rule'] array key the original code used.
+	// Resolve the real GUI id via exec_php (same mechanism the client uses
+	// for reads), then delete via the stock GUI handler (which persists via
+	// write_config and marks the filter subsystem dirty), then verify.
+	type posResp struct {
+		Pos int `json:"pos"`
 	}
+	command := "$i=-1;foreach (get_filter_rules_list() as $r) {$i++;if (is_array($r) && isset($r['tracker']) && (string)$r['tracker'] === 'TRACKER') {print(json_encode(array(\"pos\" => $i)));return;}}print(json_encode(array(\"pos\" => -1)));"
+	command = strings.ReplaceAll(command, "TRACKER", tracker)
 
-	controlID, err := rules.GetControlIDByTracker(tracker)
-	if err != nil {
-		return fmt.Errorf("%w firewall rule, %w", ErrGetOperationFailed, err)
+	var pr posResp
+	if err := pf.executePHPCommand(ctx, command, &pr); err != nil {
+		return fmt.Errorf("%w firewall rule position, %w", ErrGetOperationFailed, err)
+	}
+	if pr.Pos < 0 {
+		return fmt.Errorf("%w firewall rule with tracker %s in rules list", ErrNotFound, tracker)
 	}
 
 	relativeURL := url.URL{Path: "firewall_rules.php"}
 	values := url.Values{
 		"act": {"del"},
-		"id":  {strconv.Itoa(*controlID)},
+		"id":  {strconv.Itoa(pr.Pos)},
+	}
+	if iface != "" {
+		values.Set("if", iface)
+	}
+	if pf.tokenKey != "" && pf.token != "" {
+		values.Set(pf.tokenKey, pf.token)
 	}
 
-	_, err = pf.callHTML(ctx, http.MethodPost, relativeURL, &values)
+	_, _, err := pf.callHTMLRaw(ctx, http.MethodPost, relativeURL, &values)
 	if err != nil {
 		return fmt.Errorf("%w firewall rule, %w", ErrDeleteOperationFailed, err)
 	}
 
-	rules, err = pf.getFirewallRules(ctx)
+	rules, err := pf.getFirewallRules(ctx)
 	if err != nil {
 		return fmt.Errorf("%w firewall rules after deleting, %w", ErrGetOperationFailed, err)
 	}
 
 	if _, err := rules.GetByTracker(tracker); err == nil {
-		return fmt.Errorf("%w firewall rule, still exists", ErrDeleteOperationFailed)
+		return fmt.Errorf("%w firewall rule, still exists after GUI delete of position %d", ErrDeleteOperationFailed, pr.Pos)
 	}
 
 	return nil

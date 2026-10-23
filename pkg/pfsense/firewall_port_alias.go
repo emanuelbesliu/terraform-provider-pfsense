@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 type firewallPortAliasResponse struct {
@@ -267,7 +268,16 @@ func (pf *Client) DeleteFirewallPortAlias(ctx context.Context, name string) erro
 	}
 
 	if _, err := portAliases.GetByName(name); err == nil {
-		return fmt.Errorf("%w port alias, still exists", ErrDeleteOperationFailed)
+		// pfSense write_config can race the verifying read (plain overwrite
+		// of /conf/config.xml by the GUI request that just deleted the entry);
+		// re-verify once after a short pause beforereporting a phantom failure.
+		time.Sleep(1500 * time.Millisecond)
+		if portAliases, err = pf.getFirewallPortAliases(ctx); err != nil {
+			return fmt.Errorf("%w port alias aliases after retrying read, %w", ErrGetOperationFailed, err)
+		}
+		if _, err := portAliases.GetByName(name); err == nil {
+			return fmt.Errorf("%w port alias, still exists", ErrDeleteOperationFailed)
+		}
 	}
 
 	return nil

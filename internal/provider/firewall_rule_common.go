@@ -26,6 +26,9 @@ type FirewallRuleModel struct {
 	Description   types.String `tfsdk:"description"`
 	Disabled      types.Bool   `tfsdk:"disabled"`
 	Log           types.Bool   `tfsdk:"log"`
+	Floating      types.Bool   `tfsdk:"floating"`
+	Direction     types.String `tfsdk:"direction"`
+	Quick         types.Bool   `tfsdk:"quick"`
 }
 
 func (FirewallRuleModel) descriptions() map[string]attrDescription {
@@ -75,6 +78,15 @@ func (FirewallRuleModel) descriptions() map[string]attrDescription {
 		"log": {
 			Description: "Log packets matched by this rule.",
 		},
+		"floating": {
+			Description: "Add the rule to the floating ruleset. The interface value is a comma-separated list (e.g. \"wan,lan\").",
+		},
+		"direction": {
+			Description: "Direction for a floating rule: \"any\", \"in\" or \"out\".",
+		},
+		"quick": {
+			Description: "Quick-match flag for a floating rule.",
+		},
 	}
 }
 
@@ -94,6 +106,9 @@ func (FirewallRuleModel) AttrTypes() map[string]attr.Type {
 		"description":         types.StringType,
 		"disabled":            types.BoolType,
 		"log":                 types.BoolType,
+		"floating":            types.BoolType,
+		"direction":           types.StringType,
+		"quick":               types.BoolType,
 	}
 }
 
@@ -126,6 +141,9 @@ func (m *FirewallRuleModel) Set(_ context.Context, r pfsense.FirewallRule) diag.
 
 	m.Disabled = types.BoolValue(r.Disabled)
 	m.Log = types.BoolValue(r.Log)
+	m.Floating = types.BoolValue(r.Floating)
+	m.Direction = types.StringValue(r.Direction)
+	m.Quick = types.BoolValue(r.Quick)
 
 	return diags
 }
@@ -229,6 +247,12 @@ func (m FirewallRuleModel) Value(_ context.Context, r *pfsense.FirewallRule) dia
 		"Log cannot be parsed",
 		r.SetLog(m.Log.ValueBool()),
 	)
+
+	r.SetFloating(!m.Floating.IsNull() && m.Floating.ValueBool())
+	r.SetQuick(!m.Quick.IsNull() && m.Quick.ValueBool())
+	if !m.Direction.IsNull() {
+		r.SetDirection(m.Direction.ValueString())
+	}
 
 	if !m.Tracker.IsNull() && !m.Tracker.IsUnknown() {
 		addPathError(
