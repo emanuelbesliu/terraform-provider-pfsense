@@ -272,7 +272,7 @@ func (r *FirewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.DeleteFirewallRule(ctx, data.Tracker.ValueString())
+	err := r.client.DeleteFirewallRule(ctx, data.Tracker.ValueString(), data.Interface.ValueString())
 	if addError(&resp.Diagnostics, "Error deleting firewall rule", err) {
 		return
 	}
