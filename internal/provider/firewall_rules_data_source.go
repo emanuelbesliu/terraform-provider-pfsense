@@ -118,6 +118,18 @@ func (d *FirewallRulesDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							Description: FirewallRuleModel{}.descriptions()["log"].Description,
 							Computed:    true,
 						},
+						"floating": schema.BoolAttribute{
+							Description: FirewallRuleModel{}.descriptions()["floating"].Description,
+							Computed:    true,
+						},
+						"direction": schema.StringAttribute{
+							Description: FirewallRuleModel{}.descriptions()["direction"].Description,
+							Computed:    true,
+						},
+						"quick": schema.BoolAttribute{
+							Description: FirewallRuleModel{}.descriptions()["quick"].Description,
+							Computed:    true,
+						},
 					},
 				},
 			},

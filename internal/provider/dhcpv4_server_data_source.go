@@ -95,6 +95,11 @@ func (d *DHCPv4ServerDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"kea_custom_configuration": schema.StringAttribute{
+				Description:         DHCPv4ServerModel{}.descriptions()["kea_custom_configuration"].Description,
+				MarkdownDescription: DHCPv4ServerModel{}.descriptions()["kea_custom_configuration"].Description,
+				Optional:            true,
+			},
 			"tftp_server": schema.StringAttribute{
 				Description: DHCPv4ServerModel{}.descriptions()["tftp_server"].Description,
 				Computed:    true,

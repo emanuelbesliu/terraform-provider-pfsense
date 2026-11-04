@@ -27,6 +27,7 @@ type DHCPv4ServerModel struct {
 	WINSServers      types.List           `tfsdk:"wins_servers"`
 	NTPServers       types.List           `tfsdk:"ntp_servers"`
 	TFTPServer       types.String         `tfsdk:"tftp_server"`
+	KeaCustomConfig  types.String         `tfsdk:"kea_custom_configuration"`
 	LDAPServer       types.String         `tfsdk:"ldap_server"`
 	MACAllow         types.String         `tfsdk:"mac_allow"`
 	MACDeny          types.String         `tfsdk:"mac_deny"`
@@ -73,6 +74,9 @@ func (DHCPv4ServerModel) descriptions() map[string]attrDescription {
 		"ntp_servers": {
 			Description: fmt.Sprintf("NTP (Network Time Protocol) servers provided to DHCP clients (up to %d).", pfsense.DHCPv4ServerMaxNTPServers),
 		},
+		"kea_custom_configuration": {
+			Description: "Kea DHCP custom configuration (valid JSON) merged into this subnet's scope. Only stored/used when the global DHCP backend is 'kea'; see the pfsense_dhcp_backend resource.",
+		},
 		"tftp_server": {
 			Description: "TFTP server hostname or IP address provided to DHCP clients.",
 		},
@@ -100,25 +104,26 @@ func (DHCPv4ServerModel) descriptions() map[string]attrDescription {
 
 func (DHCPv4ServerModel) AttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"interface":          types.StringType,
-		"enable":             types.BoolType,
-		"range_from":         types.StringType,
-		"range_to":           types.StringType,
-		"dns_servers":        types.ListType{ElemType: types.StringType},
-		"gateway":            types.StringType,
-		"domain_name":        types.StringType,
-		"domain_search_list": types.ListType{ElemType: types.StringType},
-		"default_lease_time": timetypes.GoDurationType{},
-		"maximum_lease_time": timetypes.GoDurationType{},
-		"wins_servers":       types.ListType{ElemType: types.StringType},
-		"ntp_servers":        types.ListType{ElemType: types.StringType},
-		"tftp_server":        types.StringType,
-		"ldap_server":        types.StringType,
-		"mac_allow":          types.StringType,
-		"mac_deny":           types.StringType,
-		"deny_unknown":       types.BoolType,
-		"ignore_client_uids": types.BoolType,
-		"static_arp":         types.BoolType,
+		"interface":                types.StringType,
+		"enable":                   types.BoolType,
+		"range_from":               types.StringType,
+		"range_to":                 types.StringType,
+		"dns_servers":              types.ListType{ElemType: types.StringType},
+		"gateway":                  types.StringType,
+		"domain_name":              types.StringType,
+		"domain_search_list":       types.ListType{ElemType: types.StringType},
+		"default_lease_time":       timetypes.GoDurationType{},
+		"maximum_lease_time":       timetypes.GoDurationType{},
+		"wins_servers":             types.ListType{ElemType: types.StringType},
+		"ntp_servers":              types.ListType{ElemType: types.StringType},
+		"kea_custom_configuration": types.StringType,
+		"tftp_server":              types.StringType,
+		"ldap_server":              types.StringType,
+		"mac_allow":                types.StringType,
+		"mac_deny":                 types.StringType,
+		"deny_unknown":             types.BoolType,
+		"ignore_client_uids":       types.BoolType,
+		"static_arp":               types.BoolType,
 	}
 }
 
@@ -202,6 +207,12 @@ func (m *DHCPv4ServerModel) Set(ctx context.Context, srv pfsense.DHCPv4Server) d
 		m.NTPServers = ntpValue
 	} else {
 		m.NTPServers = types.ListNull(types.StringType)
+	}
+
+	if srv.KeaCustomConfig != "" {
+		m.KeaCustomConfig = types.StringValue(srv.KeaCustomConfig)
+	} else {
+		m.KeaCustomConfig = types.StringNull()
 	}
 
 	if srv.TFTPServer != "" {
@@ -347,6 +358,15 @@ func (m DHCPv4ServerModel) Value(ctx context.Context, srv *pfsense.DHCPv4Server)
 			path.Root("ntp_servers"),
 			"NTP servers cannot be parsed",
 			srv.SetNTPServers(ntpServers),
+		)
+	}
+
+	if !m.KeaCustomConfig.IsNull() {
+		addPathError(
+			&diags,
+			path.Root("kea_custom_configuration"),
+			"Kea custom configuration must be valid JSON",
+			srv.SetKeaCustomConfig(m.KeaCustomConfig.ValueString()),
 		)
 	}
 

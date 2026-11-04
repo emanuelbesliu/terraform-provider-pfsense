@@ -51,6 +51,8 @@ type mutexes struct {
 	DNSResolverAdvanced        sync.RWMutex
 	DNSResolverConfigFile      sync.RWMutex
 	DNSResolverGeneral         sync.RWMutex
+	Lagg                       sync.RWMutex
+	DhcpBackend                sync.RWMutex
 	DNSResolverHostOverride    sync.RWMutex
 	DNSResolverDomainOverride  sync.RWMutex
 	ExecutePHPCommand          sync.RWMutex
@@ -272,6 +274,8 @@ func NewClient(ctx context.Context, opts *Options) (*Client, error) {
 		return nil, err
 	}
 
+	registerBulkTarget(pfsense)
+
 	return pfsense, nil
 }
 
@@ -408,7 +412,7 @@ func (pf *Client) executePHPCommand(ctx context.Context, command string, value a
 
 		commandErr := doc.FindMatcher(goquery.Single("#errdiv"))
 		if commandErr.Length() == 1 {
-			return fmt.Errorf("%w, php command failed, %s", ErrServerValidation, resp.Text())
+			return fmt.Errorf("%w, php command failed, pre=%q errdiv=%q", ErrServerValidation, resp.Text(), commandErr.Text())
 		}
 
 		preText := resp.Text()
@@ -471,4 +475,11 @@ func safeSplit(s string, sep string) []string {
 	}
 
 	return strings.Split(s, sep)
+}
+
+// registerBulkTarget keeps the client for the graceful-exit flush (bulk mode).
+func registerBulkTarget(pf *Client) {
+	if BulkEnabled() {
+		pf.registerBulk()
+	}
 }

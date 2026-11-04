@@ -33,6 +33,12 @@ func testAccNewClient() (*pfsense.Client, error) {
 		Password: os.Getenv("TF_PFSENSE_PASSWORD"),
 	}
 
+	if os.Getenv("TF_PFSENSE_TLS_SKIP_VERIFY") == "true" {
+		// Lab appliances use self-signed certificates.
+		skip := true
+		opts.TLSSkipVerify = &skip
+	}
+
 	urlValue := os.Getenv("TF_PFSENSE_URL")
 	if urlValue == "" {
 		urlValue = pfsense.DefaultURL

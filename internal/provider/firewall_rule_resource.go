@@ -136,6 +136,24 @@ func (r *FirewallRuleResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Default:     booldefault.StaticBool(false),
 			},
+			"floating": schema.BoolAttribute{
+				Description: FirewallRuleModel{}.descriptions()["floating"].Description,
+				Computed:    true,
+				Optional:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"direction": schema.StringAttribute{
+				Description: FirewallRuleModel{}.descriptions()["direction"].Description,
+				Computed:    true,
+				Optional:    true,
+				Default:     stringdefault.StaticString("any"),
+			},
+			"quick": schema.BoolAttribute{
+				Description: FirewallRuleModel{}.descriptions()["quick"].Description,
+				Computed:    true,
+				Optional:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 			"apply": schema.BoolAttribute{
 				Description:         applyDescription,
 				MarkdownDescription: applyMarkdownDescription,
@@ -171,6 +189,22 @@ func (r *FirewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	if pfsense.BulkEnabled() && pfsense.RuleSupportedForBulk(ruleReq) && ruleReq.Description != "" {
+		ph := r.client.EnqueueCreate(ruleReq)
+		if r.client.PendingCount() >= 10 {
+			if ferr := r.client.FlushPending(ctx); ferr != nil {
+				addWarning(&resp.Diagnostics, "Bulk flush (create threshold) failed", ferr)
+			}
+		}
+		if real, ok := r.client.ResolvePlaceholder(ph); ok {
+			data.Tracker = types.StringValue(real)
+		} else {
+			data.Tracker = types.StringValue(ph)
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+		return
+	}
+
 	rule, err := r.client.CreateFirewallRule(ctx, ruleReq)
 	if addError(&resp.Diagnostics, "Error creating firewall rule", err) {
 		return
@@ -195,6 +229,59 @@ func (r *FirewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if pfsense.BulkEnabled() && r.client.PendingCount() > 0 {
+		if ferr := r.client.FlushPending(ctx); ferr != nil {
+			addWarning(&resp.Diagnostics, "Bulk flush failed", ferr)
+			return
+		}
+	}
+	if pfsense.BulkEnabled() {
+		tv := data.Tracker.ValueString()
+		if len(tv) >= 8 && tv[:8] == "pending-" {
+			if real, ok := r.client.ResolvePlaceholder(tv); ok {
+				data.Tracker = types.StringValue(real)
+			} else {
+				if ferr := r.client.EnsureTrackerCache(ctx); ferr != nil {
+					addWarning(&resp.Diagnostics, "Bulk tracker cache refresh failed", ferr)
+				}
+				if real := r.client.LookupTracker(data.Description.ValueString()); real != "" {
+					data.Tracker = types.StringValue(real)
+				} else if r.client.PendingCount() == 0 {
+					// Dead placeholder: this provider process never enqueued it and no
+					// live rule matches the description - removed out-of-band. Drop it
+					// so plan self-heals with a clean recreate rather than keeping a
+					// never-resolving id forever.
+					resp.State.RemoveResource(ctx)
+					return
+				} else {
+					addWarning(&resp.Diagnostics, "Bulk pending rule unresolved", fmt.Errorf("no live rule matches description %q after flush", data.Description.ValueString()))
+					return
+				}
+			}
+		}
+	}
+
+	if pfsense.BulkEnabled() {
+		if errc := r.client.EnsureTrackerCache(ctx); errc == nil {
+			if cached, found := r.client.BulkLookupRule(data.Tracker.ValueString()); found {
+				resp.Diagnostics.Append(data.Set(ctx, *cached)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+				return
+			}
+		}
+	}
+
+	tv := data.Tracker.ValueString()
+	if pfsense.BulkEnabled() && len(tv) >= 8 && tv[:8] == "pending-" {
+		addWarning(&resp.Diagnostics, "Rule still queued in bulk apply mode",
+			fmt.Errorf("tracker %q is a bulk placeholder; it will be resolved on the next refresh", tv))
+
 		return
 	}
 
@@ -245,6 +332,26 @@ func (r *FirewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	// Use the tracker from state for the update lookup
 	ruleReq.Tracker = state.Tracker.ValueString()
 
+	tvv := state.Tracker.ValueString()
+	if pfsense.BulkEnabled() && pfsense.RuleSupportedForBulk(ruleReq) && ruleReq.Description != "" &&
+		!(len(tvv) >= 8 && tvv[:8] == "pending-") {
+		r.client.EnqueueUpdate(ruleReq)
+		if r.client.PendingCount() >= 10 {
+			if ferr := r.client.FlushPending(ctx); ferr != nil {
+				addWarning(&resp.Diagnostics, "Bulk flush (update threshold) failed", ferr)
+			}
+		}
+		data.Tracker = state.Tracker
+		if cached, found := r.client.BulkLookupRule(state.Tracker.ValueString()); found {
+			resp.Diagnostics.Append(data.Set(ctx, *cached)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+		return
+	}
+
 	rule, err := r.client.UpdateFirewallRule(ctx, ruleReq)
 	if addError(&resp.Diagnostics, "Error updating firewall rule", err) {
 		return
@@ -272,7 +379,48 @@ func (r *FirewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.DeleteFirewallRule(ctx, data.Tracker.ValueString())
+	// Floating rules must be deleted through the GUI "FloatingRules" tab;
+	// their stored interface (e.g. "wan,lan") is not a tab name, and the
+	// pfSense delete handler skips rules whose interface mismatches the tab.
+	deleteIface := data.Interface.ValueString()
+	if data.Floating.ValueBool() {
+		deleteIface = "FloatingRules"
+	}
+
+	if pfsense.BulkEnabled() && !data.Floating.ValueBool() {
+		tv := data.Tracker.ValueString()
+		if len(tv) >= 8 && tv[:8] == "pending-" {
+			if r.client.PendingCount() > 0 {
+				if ferr := r.client.FlushPending(ctx); ferr != nil {
+					addWarning(&resp.Diagnostics, "Bulk flush (pending-resolve) failed", ferr)
+				}
+			}
+			if real, ok := r.client.ResolvePlaceholder(tv); ok {
+				tv = real
+			} else {
+				if ferr := r.client.EnsureTrackerCache(ctx); ferr != nil {
+					addWarning(&resp.Diagnostics, "Bulk tracker cache refresh failed", ferr)
+					return
+				}
+				real := r.client.LookupTracker(data.Description.ValueString())
+				if real == "" {
+					addWarning(&resp.Diagnostics, "Bulk delete unresolved", fmt.Errorf("no live rule matches %q; resource kept in state", data.Description.ValueString()))
+					return
+				}
+				tv = real
+			}
+		}
+		r.client.EnqueueDelete(tv)
+		if r.client.PendingCount() >= 2 {
+			if ferr := r.client.FlushPending(ctx); ferr != nil {
+				addWarning(&resp.Diagnostics, "Bulk flush (delete threshold) failed", ferr)
+			}
+		}
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	err := r.client.DeleteFirewallRule(ctx, data.Tracker.ValueString(), deleteIface)
 	if addError(&resp.Diagnostics, "Error deleting firewall rule", err) {
 		return
 	}
