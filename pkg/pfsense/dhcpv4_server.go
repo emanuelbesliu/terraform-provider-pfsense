@@ -2,6 +2,7 @@ package pfsense
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/netip"
@@ -61,6 +62,7 @@ type dhcpv4ServerResponse struct {
 	DDNSDomainKeyName string   `json:"ddnsdomainkeyname"` // DDNS key name
 	DDNSDomainKey     string   `json:"ddnsdomainkey"`     // DDNS key
 	DDNSClientUpdates string   `json:"ddnsclientupdates"` // DDNS client updates policy
+	CustomKeaConfig   string   `json:"custom_kea_config"` // base64-stored Kea JSON, decoded server-side
 }
 
 // ======================================================================
@@ -88,6 +90,11 @@ type DHCPv4Server struct {
 	DenyUnknown      bool
 	IgnoreClientUIDs bool
 	StaticARP        bool
+	// KeaCustomConfig holds the per-subnet "custom configuration" JSON that
+	// the Kea DHCP backend merges into its subnet global scope. It is only
+	// relevant when the global DHCP backend is "kea"; see the
+	// pfsense_dhcp_backend resource.
+	KeaCustomConfig string
 }
 
 // ======================================================================
@@ -293,6 +300,16 @@ func (s *DHCPv4Server) SetTFTPServer(tftp string) error {
 	return nil
 }
 
+func (s *DHCPv4Server) SetKeaCustomConfig(cfg string) error {
+	if cfg != "" && !json.Valid([]byte(cfg)) {
+		return fmt.Errorf("%w: kea custom configuration is not valid JSON", ErrUnableToParse)
+	}
+
+	s.KeaCustomConfig = cfg
+
+	return nil
+}
+
 func (s *DHCPv4Server) SetLDAPServer(ldap string) error {
 	s.LDAPServer = ldap
 
@@ -387,6 +404,10 @@ func parseDHCPv4ServerResponse(iface string, resp dhcpv4ServerResponse) (DHCPv4S
 		return srv, fmt.Errorf("%w, %w", unableToParseErr, err)
 	}
 
+	if err := srv.SetKeaCustomConfig(resp.CustomKeaConfig); err != nil {
+		return DHCPv4Server{}, fmt.Errorf("%w: kea custom configuration, %w", ErrUnableToParse, err)
+	}
+
 	if err := srv.SetTFTPServer(resp.TFTPServer); err != nil {
 		return srv, fmt.Errorf("%w, %w", unableToParseErr, err)
 	}
@@ -459,7 +480,8 @@ func (pf *Client) getDHCPv4Server(ctx context.Context, iface string) (*DHCPv4Ser
 			"'ddnsdomainprimary' => isset($dhcpd['ddnsdomainprimary']) ? $dhcpd['ddnsdomainprimary'] : '',"+
 			"'ddnsdomainkeyname' => isset($dhcpd['ddnsdomainkeyname']) ? $dhcpd['ddnsdomainkeyname'] : '',"+
 			"'ddnsdomainkey' => isset($dhcpd['ddnsdomainkey']) ? $dhcpd['ddnsdomainkey'] : '',"+
-			"'ddnsclientupdates' => isset($dhcpd['ddnsclientupdates']) ? $dhcpd['ddnsclientupdates'] : ''"+
+			"'ddnsclientupdates' => isset($dhcpd['ddnsclientupdates']) ? $dhcpd['ddnsclientupdates'] : '',"+
+			"'custom_kea_config' => isset($dhcpd['custom_kea_config']) ? base64_decode($dhcpd['custom_kea_config']) : '',"+
 			");"+
 			"print(json_encode($out));",
 		phpEscape(iface),
@@ -532,6 +554,9 @@ func dhcpv4ServerFormValues(srv DHCPv4Server) url.Values {
 
 	for index, ntp := range srv.NTPServers {
 		values.Set(fmt.Sprintf("ntp%d", index+1), safeAddrString(ntp))
+	}
+	if srv.KeaCustomConfig != "" {
+		values.Set("custom_kea_config", srv.KeaCustomConfig)
 	}
 
 	return values

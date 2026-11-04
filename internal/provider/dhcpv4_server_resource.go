@@ -124,6 +124,11 @@ func (r *DHCPv4ServerResource) Schema(_ context.Context, _ resource.SchemaReques
 					listvalidator.SizeAtMost(pfsense.DHCPv4ServerMaxNTPServers),
 				},
 			},
+			"kea_custom_configuration": schema.StringAttribute{
+				Description:         DHCPv4ServerModel{}.descriptions()["kea_custom_configuration"].Description,
+				MarkdownDescription: DHCPv4ServerModel{}.descriptions()["kea_custom_configuration"].Description,
+				Optional:            true,
+			},
 			"tftp_server": schema.StringAttribute{
 				Description: DHCPv4ServerModel{}.descriptions()["tftp_server"].Description,
 				Optional:    true,
